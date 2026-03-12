@@ -19,6 +19,9 @@ export default function DatesPage() {
     router.push("/rental/items");
   };
 
+  const hasInvalidRange =
+    !!pickupDate && !!returnDate && pickupDate > returnDate;
+
   const today = new Date().toISOString().split("T")[0];
 
   return (
@@ -99,7 +102,7 @@ export default function DatesPage() {
               </div>
             </div>
 
-            {pickupDate && returnDate && pickupDate > returnDate && (
+            {hasInvalidRange && (
               <p className="text-sm text-red-600 text-right">
                 תאריך החזרה חייב להיות אחרי תאריך הלקיחה.
               </p>
@@ -115,11 +118,7 @@ export default function DatesPage() {
               <button
                 type="submit"
                 className="flex-1 rounded-xl bg-brand py-3 font-semibold text-white shadow-[0_2px_8px_rgba(200,90,108,0.3)] hover:bg-brand-dark disabled:opacity-60"
-                disabled={
-                  !pickupDate ||
-                  !returnDate ||
-                  (pickupDate && returnDate && pickupDate > returnDate)
-                }
+                disabled={!pickupDate || !returnDate || hasInvalidRange}
               >
                 המשך לבחירת ציוד
               </button>

@@ -37,6 +37,10 @@ type SavedRental = {
   };
   // מצב החזרה – אופציונלי, נשמר בדפדפן
   returnCompleted?: boolean;
+   // הערות חופשיות מההזמנה (ציוד אחר, הוראות מיוחדות וכו')
+  notes?: string;
+  // חיוב נוסף שסוכם בהזמנה (אופציונלי)
+  extraChargeAmount?: number;
 };
 
 function loadRentals(): SavedRental[] {

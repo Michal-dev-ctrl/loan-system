@@ -21,8 +21,11 @@ type SavedRental = {
     purchaseTotal: number;
     rentalTotal: number;
     totalToPayNow: number;
-    
   };
+  // הערות חופשיות על ההזמנה (ציוד אחר, הוראות מיוחדות וכו')
+  notes?: string;
+  // חיוב נוסף שאינו מופיע ברשימת הציוד (לדוגמה מוצר משלים)
+  extraChargeAmount?: number;
 };
 
 const draftSample = {
@@ -70,6 +73,10 @@ export default function SummaryPage() {
   const [emailDomain, setEmailDomain] = useState(EMAIL_DOMAINS[0]);
   const [phonePrefix, setPhonePrefix] = useState(PHONE_PREFIXES[0]);
   const [phoneRest, setPhoneRest] = useState("");
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailSendMessage, setEmailSendMessage] = useState<"success" | "error" | null>(null);
+  const [notes, setNotes] = useState("");
+  const [extraChargeAmount, setExtraChargeAmount] = useState(0);
 
   const donation = draft.deposit.donationAmount;
   const depositAmount = draft.deposit.depositAmount;
@@ -85,6 +92,7 @@ export default function SummaryPage() {
   );
 
   const { rentalTotal, effectiveRentalTotal, chuppahCoveredByDonation } = useMemo(() => {
+    // פריטי השכרה בתשלום (כרגע מזוודת חופה בלבד)
     const paidRentalItems = catalog.filter(
       (i) => i.category !== "purchase" && i.price > 0,
     );
@@ -99,15 +107,17 @@ export default function SummaryPage() {
     const chuppahQty = draft.items["extra-chuppah-kit"] || 0;
     const chuppahTotal = chuppahQty * chuppahPrice;
 
-    // האם קיימים פריטי השכרה נוספים בתשלום (לא קנייה) besides מזוודת חופה
-    const hasOtherPaidRentals = paidRentalItems.some((item) => {
+    // האם קיימים פריטי השכרה נוספים בכלל (גם אם מחירם 0), חוץ ממזוודת חופה
+    const anyOtherRentalItems = catalog.some((item) => {
       if (item.id === "extra-chuppah-kit") return false;
+      if (item.category === "purchase") return false;
       const qty = draft.items[item.id] || 0;
       return qty > 0;
     });
 
-    // הכלל: רק אם לוקחים *רק* מזוודת חופה (בלי שום אביזר נוסף) והתרומה מכסה – לא גובים 60 ש"ח נוספים
-    const chuppahOnlyRental = chuppahTotal > 0 && !hasOtherPaidRentals;
+    // הכלל: רק אם לוקחים *רק* מזוודת חופה (בלי שום אביזר השכרה נוסף כלל)
+    // והתרומה מכסה – לא גובים 60 ש"ח נוספים עבור המזוודה
+    const chuppahOnlyRental = chuppahTotal > 0 && !anyOtherRentalItems;
     const coveredByDonation =
       chuppahOnlyRental && draft.deposit.donationAmount >= chuppahPrice;
 
@@ -122,7 +132,8 @@ export default function SummaryPage() {
     donation +
     purchaseTotal +
     effectiveRentalTotal +
-    (draft.deposit.option === "cash" ? depositAmount : 0);
+    (draft.deposit.option === "cash" ? depositAmount : 0) +
+    (extraChargeAmount > 0 ? extraChargeAmount : 0);
 
   const fullName = `${draft.personal.firstName} ${draft.personal.lastName}`.trim();
 
@@ -162,6 +173,8 @@ export default function SummaryPage() {
           rentalTotal,
           totalToPayNow,
         },
+        notes: notes.trim() || undefined,
+        extraChargeAmount: extraChargeAmount > 0 ? extraChargeAmount : undefined,
       };
 
       existing.push(rental);
@@ -217,6 +230,11 @@ export default function SummaryPage() {
     const returnHeb = formatHebrewDateShort(rental.dates.returnDate);
     lines.push(`תאריך לקיחה: ${formatDisplayDate(rental.dates.pickupDate)}${pickupHeb ? ` ${pickupHeb}` : ""}`);
     lines.push(`תאריך החזרה: ${formatDisplayDate(rental.dates.returnDate)}${returnHeb ? ` ${returnHeb}` : ""}`);
+    if (rental.notes && rental.notes.trim()) {
+      lines.push("");
+      lines.push("פרטים נוספים / ציוד אחר:");
+      lines.push(rental.notes.trim());
+    }
     lines.push("");
     lines.push("סכומים:");
     lines.push(`תרומה: ${rental.totals.donation} ₪`);
@@ -227,11 +245,14 @@ export default function SummaryPage() {
     if (rental.totals.rentalTotal > 0) {
       lines.push(`השכרת ציוד: ${rental.totals.rentalTotal} ₪`);
     }
+    if (typeof rental.extraChargeAmount === "number" && rental.extraChargeAmount > 0) {
+      lines.push(`חיוב נוסף (אחר): ${rental.extraChargeAmount} ₪`);
+    }
     lines.push(`סה"כ לתשלום עכשיו: ${rental.totals.totalToPayNow} ₪`);
     return lines.join("\n");
   };
 
-  const handleSaveAndEmail = () => {
+  const handleSaveAndEmail = async () => {
     const rental = saveRental();
     if (!rental) return;
     const text = buildReceiptText(rental);
@@ -256,30 +277,28 @@ export default function SummaryPage() {
         return;
       }
       const fullEmail = `${local}@${emailDomain}`;
-      const subject = encodeURIComponent(
-        `קבלה מגמ"ח אור לכלה שמחת "יום טוב" - ${rental.id}`
-      );
-      const maxBodyChars = 450;
-      const shortText =
-        text.length > maxBodyChars
-          ? text.slice(0, maxBodyChars) + "\n\n(פרטים מלאים – בהדפסת הקבלה)"
-          : text;
-      const body = encodeURIComponent(shortText);
-      const mailto = `mailto:${encodeURIComponent(fullEmail)}?subject=${subject}&body=${body}`;
-      const a = document.createElement("a");
-      a.href = mailto;
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const subject = `קבלה מגמ"ח אור לכלה שמחת "יום טוב" - ${rental.id}`;
+      setEmailSendMessage(null);
+      setIsSendingEmail(true);
       try {
-        navigator.clipboard.writeText(shortText);
+        const res = await fetch("/api/send-receipt", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to: fullEmail, subject, text }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) {
+          setEmailSendMessage("success");
+        } else {
+          setEmailSendMessage("error");
+          alert(data?.error || "שליחת המייל נכשלה. נסי שוב או בדקי את ההגדרות.");
+        }
       } catch {
-        // ignore
+        setEmailSendMessage("error");
+        alert("שגיאה בשליחת המייל. נסי שוב.");
+      } finally {
+        setIsSendingEmail(false);
       }
-      setTimeout(() => {
-        alert("הקבלה הועתקה ללוח. אם לא נפתח חלון מייל – פתחי Gmail/Outlook והדביקי (Ctrl+V) במייל חדש.");
-      }, 600);
     }
   };
 
@@ -446,6 +465,37 @@ export default function SummaryPage() {
           )}
         </section>
 
+        <section className="mt-4 rounded-xl border border-zinc-200 bg-white p-4 text-sm">
+          <h2 className="mb-2 text-base font-semibold text-brand text-right">
+            פרטים נוספים / ציוד אחר (אופציונלי)
+          </h2>
+          <div className="space-y-2">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-right resize-none"
+              placeholder=""
+            />
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <label className="text-xs text-zinc-700 text-right font-medium">
+                סכום נוסף לתשלום עבור ציוד אחר (אופציונלי, ₪)
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={extraChargeAmount || ""}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setExtraChargeAmount(Number.isNaN(val) ? 0 : Math.max(0, val));
+                }}
+                className="w-full sm:w-40 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-left font-semibold"
+                placeholder="לדוגמה: 50"
+              />
+            </div>
+          </div>
+        </section>
+
         <section className="mt-4 rounded-xl border border-brand-soft/60 bg-brand-soft/20 p-4 text-sm">
           <h2 className="mb-2 text-base font-semibold text-brand text-right">
             סכומים
@@ -475,6 +525,12 @@ export default function SummaryPage() {
               <div>
                 <span className="font-medium">השכרת מזוודת חופה: </span>
                 60 ₪ (מכוסה על ידי התרומה)
+              </div>
+            )}
+            {extraChargeAmount > 0 && (
+              <div>
+                <span className="font-medium">חיוב נוסף (אחר): </span>
+                {extraChargeAmount} ₪
               </div>
             )}
             <div className="mt-1 border-t border-dashed border-zinc-300 pt-1 font-semibold">
@@ -554,12 +610,18 @@ export default function SummaryPage() {
                   />
                 </div>
               )}
+              {emailSendMessage === "success" && (
+                <p className="text-center text-sm font-medium text-green-600 mb-2">
+                  המייל נשלח בהצלחה לכתובת שהזנת.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleSaveAndEmail}
-                className="w-full rounded-xl bg-brand py-2.5 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(200,90,108,0.25)] hover:bg-brand-dark transition-colors"
+                disabled={isSendingEmail}
+                className="w-full rounded-xl bg-brand py-2.5 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(200,90,108,0.25)] hover:bg-brand-dark transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                שמירה + שליחת קבלה
+                {isSendingEmail ? "שולח מייל…" : "שמירה + שליחת קבלה"}
               </button>
             </div>
 

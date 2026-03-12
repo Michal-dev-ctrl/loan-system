@@ -36,6 +36,10 @@ type SavedRental = {
   };
   // מצב החזרה – אופציונלי, נשמר בדפדפן
   returnCompleted?: boolean;
+  // הערות חופשיות מההזמנה (ציוד אחר, הוראות מיוחדות וכו')
+  notes?: string;
+  // חיוב נוסף שסוכם בהזמנה (אופציונלי)
+  extraChargeAmount?: number;
 };
 
 type CatalogEntry = {
@@ -116,6 +120,8 @@ export default function ReturnPage() {
   const [damageTotal, setDamageTotal] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [chuppahReturned, setChuppahReturned] = useState<Record<string, boolean>>({});
+  const [otherDamageName, setOtherDamageName] = useState("");
+  const [otherDamageAmount, setOtherDamageAmount] = useState(0);
 
   useEffect(() => {
     const rentals = loadRentals();
@@ -216,8 +222,9 @@ export default function ReturnPage() {
       const missing = isReturned ? 0 : 1;
       return sum + missing * item.price;
     }, 0);
-    setDamageTotal(rentalDamage + innerDamage);
-  }, [itemsForReturn, returnedQuantities, chuppahReturned]);
+    const extra = otherDamageAmount > 0 ? otherDamageAmount : 0;
+    setDamageTotal(rentalDamage + innerDamage + extra);
+  }, [itemsForReturn, returnedQuantities, chuppahReturned, otherDamageAmount]);
 
   const damageBreakdown = useMemo(() => {
     const mainItems = itemsForReturn
@@ -261,8 +268,22 @@ export default function ReturnPage() {
       };
     }).filter((line) => line.missing > 0 && line.lineTotal > 0);
 
-    return [...mainItems, ...chuppahInner];
-  }, [itemsForReturn, returnedQuantities, chuppahReturned]);
+    const trimmedOtherName = otherDamageName.trim();
+    const extraLine =
+      otherDamageAmount > 0 && trimmedOtherName
+        ? [
+            {
+              id: "other-damage",
+              name: trimmedOtherName,
+              missing: 1,
+              price: otherDamageAmount,
+              lineTotal: otherDamageAmount,
+            },
+          ]
+        : [];
+
+    return [...mainItems, ...chuppahInner, ...extraLine];
+  }, [itemsForReturn, returnedQuantities, chuppahReturned, otherDamageName, otherDamageAmount]);
 
   const handleComplete = (e: React.FormEvent) => {
     e.preventDefault();
@@ -371,6 +392,12 @@ export default function ReturnPage() {
               , <span className="font-medium">תרומה: </span>
               {rental.deposit.donationAmount} ₪
             </div>
+            {rental.notes && rental.notes.trim() && (
+              <div>
+                <span className="font-medium">הערות להזמנה: </span>
+                {rental.notes}
+              </div>
+            )}
           </div>
         </section>
 
@@ -540,6 +567,41 @@ export default function ReturnPage() {
               </ul>
             </div>
           )}
+
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs">
+            <h3 className="text-sm font-semibold text-zinc-800">
+              נזק נוסף (אחר)
+            </h3>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex-1">
+                <label className="mb-1 block text-[11px] text-zinc-600">
+                  תיאור הנזק / המוצר
+                </label>
+                <input
+                  type="text"
+                  value={otherDamageName}
+                  onChange={(e) => setOtherDamageName(e.target.value)}
+                  placeholder="לדוגמה: תאורה מיוחדת, קישוט נוסף..."
+                  className="w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-[11px]"
+                />
+              </div>
+              <div className="w-full sm:w-32">
+                <label className="mb-1 block text-[11px] text-zinc-600">
+                  סכום לחיוב (₪)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={otherDamageAmount || ""}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setOtherDamageAmount(Number.isNaN(val) ? 0 : Math.max(0, val));
+                  }}
+                  className="w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-[11px] text-left"
+                />
+              </div>
+            </div>
+          </div>
 
           <div className="border-t border-dashed border-zinc-200 pt-3 text-xs">
             <div>
