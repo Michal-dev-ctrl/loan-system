@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend: Resend | null = null;
+if (process.env.RESEND_API_KEY) {
+  resend = new Resend(process.env.RESEND_API_KEY);
+}
 
 const FROM =
   process.env.RESEND_FROM ?? "גמ״ח אור לכלה <onboarding@resend.dev>";
 
 export async function POST(request: Request) {
-  if (!process.env.RESEND_API_KEY) {
+  if (!process.env.RESEND_API_KEY || !resend) {
     return NextResponse.json(
       { error: "חסר מפתח API לשליחת מייל (RESEND_API_KEY)" },
       { status: 500 }
