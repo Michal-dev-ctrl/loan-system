@@ -1,10 +1,8 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRentalDraft } from "../RentalContext";
 
 const IMAGE_EXTENSIONS = [".png", ".PNG", ".jpg", ".jpeg", ".JPG", ".JPEG", ".webp", ".WEBP"];
@@ -482,7 +480,7 @@ const CHUPPAH_PURCHASE_ITEMS: { id: string; name: string; unitPrice: number }[] 
   { id: "purchase-chuppah-candles", name: "נרות (5 ₪ לנר)", unitPrice: 5 },
 ];
 
-export default function ItemsPage() {
+function ItemsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { draft, setItemQuantity } = useRentalDraft();
@@ -929,3 +927,10 @@ export default function ItemsPage() {
   );
 }
 
+export default function ItemsPage() {
+  return (
+    <Suspense fallback={<div className="p-4 text-center">טוען פריטים...</div>}>
+      <ItemsPageInner />
+    </Suspense>
+  );
+}
