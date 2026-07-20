@@ -259,9 +259,13 @@ export default function SummaryPage() {
     if (!rental) return;
     // מונע redirect לפרטים אישיים בגלל איפוס הטיוטה
     setIsFinishing(true);
+    resetDraft();
+    // ניווט מלא לדף הבית (לא router) – בטוח יותר מול מסך הפרטים
+    if (typeof window !== "undefined") {
+      window.location.assign("/");
+      return;
+    }
     router.replace("/");
-    // איפוס אחרי ניווט – כשחוזרים להשכרה הטופס יהיה ריק
-    setTimeout(() => resetDraft(), 0);
   };
 
   const rentalItemsForDisplay = catalog.filter(
