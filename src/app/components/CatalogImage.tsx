@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const IMAGE_EXTENSIONS = [".webp", ".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG"] as const;
+/** סיומות קצרות בלבד – WebP קודם, ואז PNG */
+const IMAGE_EXTENSIONS = [".webp", ".png"] as const;
+
+/** שבירת מטמון ישן אחרי עדכון התמונות */
+const CACHE_BUST = "v2";
 
 type CatalogImageProps = {
   itemId?: string;
@@ -14,8 +18,15 @@ type CatalogImageProps = {
   priority?: boolean;
 };
 
+function withCacheBust(url: string): string {
+  if (!url) return url;
+  const join = url.includes("?") ? "&" : "?";
+  return `${url}${join}${CACHE_BUST}`;
+}
+
 /**
- * טוען תמונת פריט עם העדפה ל-WebP הדחוס, בלי לנסות עשרות סיומות מיותרות.
+ * טוען תמונת פריט עם העדפה ל-WebP הדחוס.
+ * מטפל גם בתמונות ממטמון הדפדפן (שבהן onLoad לפעמים לא נורה).
  */
 export function CatalogImage({
   itemId,
@@ -30,7 +41,16 @@ export function CatalogImage({
   const [extIndex, setExtIndex] = useState(0);
 
   const ext = imageUrl ? "" : IMAGE_EXTENSIONS[extIndex];
-  const src = imageUrl ?? (itemId ? `/images/items/${itemId}${ext}` : "");
+  const rawSrc = imageUrl ?? (itemId ? `/images/items/${itemId}${ext}` : "");
+  const src = rawSrc ? withCacheBust(rawSrc) : "";
+
+  // איפוס מצב כשמשנים מקור
+  useEffect(() => {
+    setLoaded(false);
+    setError(false);
+  }, [src]);
+
+  const markLoaded = () => setLoaded(true);
 
   const handleError = () => {
     if (imageUrl || !itemId) {
@@ -39,7 +59,6 @@ export function CatalogImage({
     }
     if (extIndex < IMAGE_EXTENSIONS.length - 1) {
       setExtIndex((i) => i + 1);
-      setLoaded(false);
     } else {
       setError(true);
     }
@@ -70,12 +89,18 @@ export function CatalogImage({
         alt={name}
         width={400}
         height={400}
-        className={`h-full w-full object-cover transition-opacity duration-200 ${loaded ? "opacity-100" : "opacity-0"}`}
+        className={`relative z-[1] h-full w-full object-cover transition-opacity duration-150 ${loaded ? "opacity-100" : "opacity-0"}`}
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         fetchPriority={priority ? "high" : "low"}
-        sizes="(max-width: 640px) 50vw, 200px"
-        onLoad={() => setLoaded(true)}
+        sizes="(max-width: 640px) 45vw, 180px"
+        ref={(img) => {
+          // תמונה ממטמון – onLoad כבר נורה לפני React
+          if (img?.complete && img.naturalWidth > 0) {
+            markLoaded();
+          }
+        }}
+        onLoad={markLoaded}
         onError={handleError}
       />
     </div>

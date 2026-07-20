@@ -11,11 +11,13 @@ function ItemImage({
   imageUrl,
   name,
   square = true,
+  priority = false,
 }: {
   itemId: string;
   imageUrl?: string;
   name: string;
   square?: boolean;
+  priority?: boolean;
 }) {
   return (
     <CatalogImage
@@ -23,6 +25,7 @@ function ItemImage({
       imageUrl={imageUrl}
       name={name}
       square={square}
+      priority={priority}
     />
   );
 }
@@ -639,7 +642,7 @@ function ItemsPageInner() {
             <>
               <Link href="/rental/items/arches" className={cardClickable + (archTotal > 0 ? cardSelected : "")}>
                 {archTotal > 0 && <SelectedBadge />}
-                <ItemImage itemId="basic-arch-flowers" name="קשתות" />
+                <ItemImage itemId="basic-arch-flowers" name="קשתות" priority />
                 <div className="mt-1.5 min-h-0 flex-1 flex flex-col justify-end text-right">
                   <div className="font-medium text-sm text-zinc-800 break-words leading-tight">קשתות</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5">
@@ -649,7 +652,7 @@ function ItemsPageInner() {
               </Link>
               <Link href="/rental/items/baskets" className={cardClickable + (basketTotal > 0 ? cardSelected : "")}>
                 {basketTotal > 0 && <SelectedBadge />}
-                <ItemImage itemId="basic-tablecloth" name="סלסלאות" />
+                <ItemImage itemId="basic-tablecloth" name="סלסלאות" priority />
                 <div className="mt-1.5 min-h-0 flex-1 flex flex-col justify-end text-right">
                   <div className="font-medium text-sm text-zinc-800 break-words leading-tight">סלסלאות</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5">
@@ -663,7 +666,7 @@ function ItemsPageInner() {
             <>
               <Link href="/rental/items/instruments" className={cardClickable + (instrumentsTotal > 0 ? cardSelected : "")}>
                 {instrumentsTotal > 0 && <SelectedBadge />}
-                <ItemImage itemId="happy-darbukot" name="כלי נגינה" />
+                <ItemImage itemId="happy-darbukot" name="כלי נגינה" priority />
                 <div className="mt-1.5 min-h-0 flex-1 flex flex-col justify-end text-right">
                   <div className="font-medium text-sm text-zinc-800 break-words leading-tight">כלי נגינה</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5">
@@ -673,7 +676,7 @@ function ItemsPageInner() {
               </Link>
               <Link href="/rental/items/sticks-threads" className={cardClickable + (sticksThreadsTotal > 0 ? cardSelected : "")}>
                 {sticksThreadsTotal > 0 && <SelectedBadge />}
-                <ItemImage itemId="happy-sticks-threads" name="מקלות עם חוטים" />
+                <ItemImage itemId="happy-sticks-threads" name="מקלות עם חוטים" priority />
                 <div className="mt-1.5 min-h-0 flex-1 flex flex-col justify-end text-right">
                   <div className="font-medium text-sm text-zinc-800 break-words leading-tight">מקלות עם חוטים</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5">
@@ -683,7 +686,7 @@ function ItemsPageInner() {
               </Link>
               <Link href="/rental/items/hats" className={cardClickable + (hatsTotal > 0 ? cardSelected : "")}>
                 {hatsTotal > 0 && <SelectedBadge />}
-                <ItemImage itemId="happy-hats" name="כובעים" />
+                <ItemImage itemId="happy-hats" name="כובעים" priority />
                 <div className="mt-1.5 min-h-0 flex-1 flex flex-col justify-end text-right">
                   <div className="font-medium text-sm text-zinc-800 break-words leading-tight">כובעים</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5">
@@ -693,7 +696,7 @@ function ItemsPageInner() {
               </Link>
               <Link href="/rental/items/fans" className={cardClickable + (fansTotal > 0 ? cardSelected : "")}>
                 {fansTotal > 0 && <SelectedBadge />}
-                <ItemImage itemId="happy-fans" name="מניפות" />
+                <ItemImage itemId="happy-fans" name="מניפות" priority />
                 <div className="mt-1.5 min-h-0 flex-1 flex flex-col justify-end text-right">
                   <div className="font-medium text-sm text-zinc-800 break-words leading-tight">מניפות</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5">
@@ -703,7 +706,7 @@ function ItemsPageInner() {
               </Link>
               <Link href="/rental/items/glasses" className={cardClickable + (glassesTotal > 0 ? cardSelected : "")}>
                 {glassesTotal > 0 && <SelectedBadge />}
-                <ItemImage itemId="happy-glasses" name="משקפיים וקשתות לשיער" />
+                <ItemImage itemId="happy-glasses" name="משקפיים וקשתות לשיער" priority />
                 <div className="mt-1.5 min-h-0 flex-1 flex flex-col justify-end text-right">
                   <div className="font-medium text-sm text-zinc-800 break-words leading-tight">משקפיים וקשתות לשיער</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5">
@@ -713,7 +716,7 @@ function ItemsPageInner() {
               </Link>
               <Link href="/rental/items/hearts" className={cardClickable + (heartsTotal > 0 ? cardSelected : "")}>
                 {heartsTotal > 0 && <SelectedBadge />}
-                <ItemImage itemId="happy-hearts" name="לבבות" />
+                <ItemImage itemId="happy-hearts" name="לבבות" priority />
                 <div className="mt-1.5 min-h-0 flex-1 flex flex-col justify-end text-right">
                   <div className="font-medium text-sm text-zinc-800 break-words leading-tight">לבבות</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5">
@@ -723,7 +726,7 @@ function ItemsPageInner() {
               </Link>
               <Link href="/rental/items/flower-chains" className={cardClickable + (flowerChainsTotal > 0 ? cardSelected : "")}>
                 {flowerChainsTotal > 0 && <SelectedBadge />}
-                <ItemImage itemId="happy-flower-chains" name="שרשראות פרחים" />
+                <ItemImage itemId="happy-flower-chains" name="שרשראות פרחים" priority />
                 <div className="mt-1.5 min-h-0 flex-1 flex flex-col justify-end text-right">
                   <div className="font-medium text-sm text-zinc-800 break-words leading-tight">שרשראות פרחים</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5">
@@ -820,7 +823,7 @@ function ItemsPageInner() {
           <div className="flex min-w-0 flex-1 items-center gap-4">
             <Link href="/" className="flex flex-shrink-0 items-center gap-3 rounded-xl py-1 pr-2 hover:opacity-90" aria-label="עמוד ראשי">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/logo.webp" alt="" width={160} height={100} className="h-14 w-auto min-h-[52px] object-contain sm:h-16 sm:min-h-[60px]" />
+              <img src="/images/logo.webp?v=2" alt="" width={160} height={100} className="h-14 w-auto min-h-[52px] object-contain sm:h-16 sm:min-h-[60px]" />
               <span className="hidden text-base font-semibold text-brand-dark sm:inline">עמוד ראשי</span>
             </Link>
             <button
