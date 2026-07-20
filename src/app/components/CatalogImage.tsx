@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 /** סיומות קצרות בלבד – WebP קודם, ואז PNG */
 const IMAGE_EXTENSIONS = [".webp", ".png"] as const;
@@ -26,7 +26,6 @@ function withCacheBust(url: string): string {
 
 /**
  * טוען תמונת פריט עם העדפה ל-WebP הדחוס.
- * מטפל גם בתמונות ממטמון הדפדפן (שבהן onLoad לפעמים לא נורה).
  */
 export function CatalogImage({
   itemId,
@@ -36,35 +35,26 @@ export function CatalogImage({
   className = "",
   priority = false,
 }: CatalogImageProps) {
-  const [error, setError] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const [extIndex, setExtIndex] = useState(0);
+  const [failedExts, setFailedExts] = useState(0);
+  const [broken, setBroken] = useState(false);
 
-  const ext = imageUrl ? "" : IMAGE_EXTENSIONS[extIndex];
+  const ext = imageUrl ? "" : IMAGE_EXTENSIONS[Math.min(failedExts, IMAGE_EXTENSIONS.length - 1)];
   const rawSrc = imageUrl ?? (itemId ? `/images/items/${itemId}${ext}` : "");
   const src = rawSrc ? withCacheBust(rawSrc) : "";
 
-  // איפוס מצב כשמשנים מקור
-  useEffect(() => {
-    setLoaded(false);
-    setError(false);
-  }, [src]);
-
-  const markLoaded = () => setLoaded(true);
-
   const handleError = () => {
     if (imageUrl || !itemId) {
-      setError(true);
+      setBroken(true);
       return;
     }
-    if (extIndex < IMAGE_EXTENSIONS.length - 1) {
-      setExtIndex((i) => i + 1);
+    if (failedExts < IMAGE_EXTENSIONS.length - 1) {
+      setFailedExts((n) => n + 1);
     } else {
-      setError(true);
+      setBroken(true);
     }
   };
 
-  if (error || !src) {
+  if (broken || !src) {
     return (
       <div
         className={`flex w-full items-center justify-center rounded-xl bg-zinc-100 text-zinc-400 text-xs ${square ? "aspect-square" : "h-20"} ${className}`}
@@ -79,9 +69,6 @@ export function CatalogImage({
     <div
       className={`relative w-full overflow-hidden rounded-xl bg-zinc-100 ${square ? "aspect-square" : "h-20"} ${className}`}
     >
-      {!loaded && (
-        <div className="absolute inset-0 animate-pulse bg-zinc-200" aria-hidden />
-      )}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={src}
@@ -89,18 +76,11 @@ export function CatalogImage({
         alt={name}
         width={400}
         height={400}
-        className={`relative z-[1] h-full w-full object-cover transition-opacity duration-150 ${loaded ? "opacity-100" : "opacity-0"}`}
+        className="h-full w-full object-cover bg-zinc-100"
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         fetchPriority={priority ? "high" : "low"}
         sizes="(max-width: 640px) 45vw, 180px"
-        ref={(img) => {
-          // תמונה ממטמון – onLoad כבר נורה לפני React
-          if (img?.complete && img.naturalWidth > 0) {
-            markLoaded();
-          }
-        }}
-        onLoad={markLoaded}
         onError={handleError}
       />
     </div>
