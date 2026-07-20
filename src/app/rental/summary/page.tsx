@@ -37,6 +37,7 @@ export default function SummaryPage() {
   const [extraChargeAmount, setExtraChargeAmount] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   const donation = draft.deposit.donationAmount;
   const depositAmount = draft.deposit.depositAmount;
@@ -98,10 +99,12 @@ export default function SummaryPage() {
   const fullName = `${draft.personal.firstName} ${draft.personal.lastName}`.trim();
 
   useEffect(() => {
+    // אחרי סיום הזמנה לא מפנים חזרה לפרטים אישיים
+    if (isFinishing) return;
     if (!draft.personal.firstName || !draft.personal.lastName) {
       router.replace("/rental/personal-details");
     }
-  }, [draft.personal.firstName, draft.personal.lastName, router]);
+  }, [draft.personal.firstName, draft.personal.lastName, router, isFinishing]);
 
   const buildRentalPayload = () => ({
     personal: draft.personal,
@@ -254,8 +257,11 @@ export default function SummaryPage() {
   const handleFinish = async () => {
     const rental = await saveRental();
     if (!rental) return;
-    resetDraft();
-    router.push("/rental/confirmation");
+    // מונע redirect לפרטים אישיים בגלל איפוס הטיוטה
+    setIsFinishing(true);
+    router.replace("/");
+    // איפוס אחרי ניווט – כשחוזרים להשכרה הטופס יהיה ריק
+    setTimeout(() => resetDraft(), 0);
   };
 
   const rentalItemsForDisplay = catalog.filter(
