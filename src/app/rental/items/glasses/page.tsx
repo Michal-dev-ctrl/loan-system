@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { useRentalDraft } from "../../RentalContext";
 import { AppHeader } from "../../../components/AppHeader";
+import { CatalogImage } from "../../../components/CatalogImage";
 
 const GLASSES_SUB_IDS = [
   "happy-glasses-light",
@@ -17,54 +17,6 @@ const GLASSES_SUB_ITEMS: {
   { id: "happy-glasses-light", name: "עם אורות" },
   { id: "happy-glasses-no-light", name: "ללא אורות" },
 ];
-
-const IMAGE_EXTENSIONS = [
-  ".png",
-  ".PNG",
-  ".jpg",
-  ".jpeg",
-  ".JPG",
-  ".JPEG",
-  ".webp",
-  ".WEBP",
-];
-
-function GlassesImage({ itemId, name }: { itemId: string; name: string }) {
-  const [error, setError] = useState(false);
-  const [extIndex, setExtIndex] = useState(0);
-  const ext = IMAGE_EXTENSIONS[extIndex];
-  const src = `/images/items/${itemId}${ext}`;
-
-  const handleError = () => {
-    if (extIndex < IMAGE_EXTENSIONS.length - 1) {
-      setExtIndex((i) => i + 1);
-    } else {
-      setError(true);
-    }
-  };
-
-  if (error) {
-    return (
-      <div className="flex w-full aspect-square items-center justify-center rounded-xl bg-zinc-100 text-zinc-400 text-xs">
-        אין תמונה
-      </div>
-    );
-  }
-  return (
-    <div className="relative w-full aspect-square overflow-hidden rounded-xl bg-zinc-100">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        key={src}
-        src={src}
-        alt={name}
-        className="h-full w-full object-cover"
-        loading="lazy"
-        decoding="async"
-        onError={handleError}
-      />
-    </div>
-  );
-}
 
 export default function GlassesPage() {
   const { draft, setItemQuantity } = useRentalDraft();
@@ -121,7 +73,7 @@ export default function GlassesPage() {
                       ✓
                     </span>
                   )}
-                  <GlassesImage itemId={id} name={name} />
+                  <CatalogImage itemId={id} name={name} />
                   <div className="mt-1.5 text-right">
                     <div className="font-medium text-sm text-zinc-800 break-words leading-tight">
                       {name}

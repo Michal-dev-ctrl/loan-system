@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { useRentalDraft } from "../../RentalContext";
 import { AppHeader } from "../../../components/AppHeader";
+import { CatalogImage } from "../../../components/CatalogImage";
 
 const HATS_SUB_IDS = ["happy-hats-1", "happy-hats-2"] as const;
 
@@ -11,45 +11,6 @@ const HATS_SUB_ITEMS: { id: (typeof HATS_SUB_IDS)[number]; name: string }[] = [
   { id: "happy-hats-1", name: "כובעים גדולים" },
   { id: "happy-hats-2", name: "כובעים קטנים" },
 ];
-
-const IMAGE_EXTENSIONS = [".png", ".PNG", ".jpg", ".jpeg", ".JPG", ".JPEG", ".webp", ".WEBP"];
-
-function HatImage({ itemId, name }: { itemId: string; name: string }) {
-  const [error, setError] = useState(false);
-  const [extIndex, setExtIndex] = useState(0);
-  const ext = IMAGE_EXTENSIONS[extIndex];
-  const src = `/images/items/${itemId}${ext}`;
-
-  const handleError = () => {
-    if (extIndex < IMAGE_EXTENSIONS.length - 1) {
-      setExtIndex((i) => i + 1);
-    } else {
-      setError(true);
-    }
-  };
-
-  if (error) {
-    return (
-      <div className="flex w-full aspect-square items-center justify-center rounded-xl bg-zinc-100 text-zinc-400 text-xs">
-        אין תמונה
-      </div>
-    );
-  }
-  return (
-    <div className="relative w-full aspect-square overflow-hidden rounded-xl bg-zinc-100">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        key={src}
-        src={src}
-        alt={name}
-        className="h-full w-full object-cover"
-        loading="lazy"
-        decoding="async"
-        onError={handleError}
-      />
-    </div>
-  );
-}
 
 export default function HatsPage() {
   const { draft, setItemQuantity } = useRentalDraft();
@@ -92,7 +53,7 @@ export default function HatsPage() {
                   {qty > 0 && (
                     <span className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-green-500 text-white text-sm font-bold shadow-md" aria-hidden>✓</span>
                   )}
-                  <HatImage itemId={id} name={name} />
+                  <CatalogImage itemId={id} name={name} />
                   <div className="mt-1.5 text-right">
                     <div className="font-medium text-sm text-zinc-800 break-words leading-tight">{name}</div>
                     <div className="flex items-center justify-end gap-1.5 mt-1">

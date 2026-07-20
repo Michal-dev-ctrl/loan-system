@@ -321,7 +321,7 @@ export default function ReturnPage() {
           <div className="flex justify-center mb-4 print:mb-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/logo.png"
+              src="/images/logo.webp"
               alt="גמ״ח אור לכלה שמחת יום טוב"
               className="h-20 w-auto object-contain print:h-14 print:max-w-[200px]"
             />

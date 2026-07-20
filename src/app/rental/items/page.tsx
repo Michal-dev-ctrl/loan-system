@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect } from "react";
 import { useRentalDraft } from "../RentalContext";
-
-const IMAGE_EXTENSIONS = [".png", ".PNG", ".jpg", ".jpeg", ".JPG", ".JPEG", ".webp", ".WEBP"];
+import { CatalogImage } from "../../components/CatalogImage";
 
 function ItemImage({
   itemId,
@@ -16,57 +15,15 @@ function ItemImage({
   itemId: string;
   imageUrl?: string;
   name: string;
-  /** תמונה ריבועית (ברירת מחדל) */
   square?: boolean;
 }) {
-  const [error, setError] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const [extIndex, setExtIndex] = useState(0);
-  const ext = imageUrl ? "" : IMAGE_EXTENSIONS[extIndex];
-  const src = imageUrl ?? `/images/items/${itemId}${ext}`;
-
-  const handleError = () => {
-    if (imageUrl) {
-      setError(true);
-      return;
-    }
-    if (extIndex < IMAGE_EXTENSIONS.length - 1) {
-      setExtIndex((i) => i + 1);
-    } else {
-      setError(true);
-    }
-  };
-
-  if (error) {
-    return (
-      <div
-        className={`flex w-full items-center justify-center rounded-xl bg-zinc-100 text-zinc-400 text-xs ${square ? "aspect-square" : "h-20"}`}
-        aria-hidden
-      >
-        אין תמונה
-      </div>
-    );
-  }
   return (
-    <div
-      className={`relative w-full overflow-hidden rounded-xl bg-zinc-100 ${square ? "aspect-square" : "h-20"}`}
-    >
-      {!loaded && (
-        <div className="absolute inset-0 animate-pulse bg-zinc-200" aria-hidden />
-      )}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        key={src}
-        src={src}
-        alt={name}
-        className={`h-full w-full object-cover transition-opacity duration-200 ${loaded ? "opacity-100" : "opacity-0"}`}
-        loading="lazy"
-        decoding="async"
-        fetchPriority="low"
-        onLoad={() => setLoaded(true)}
-        onError={handleError}
-      />
-    </div>
+    <CatalogImage
+      itemId={itemId}
+      imageUrl={imageUrl}
+      name={name}
+      square={square}
+    />
   );
 }
 
@@ -368,7 +325,7 @@ const CATALOG: ItemDefinition[] = [
     kind: "purchase",
     unitPrice: 50,
     damagePrice: 50,
-    imageUrl: "/images/items/purchashalfe-hearts-.png",
+    imageUrl: "/images/items/purchashalfe-hearts-.webp",
   },
   {
     id: "purchase-sparklers",
@@ -863,7 +820,7 @@ function ItemsPageInner() {
           <div className="flex min-w-0 flex-1 items-center gap-4">
             <Link href="/" className="flex flex-shrink-0 items-center gap-3 rounded-xl py-1 pr-2 hover:opacity-90" aria-label="עמוד ראשי">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/logo.png" alt="" width={160} height={100} className="h-14 w-auto min-h-[52px] object-contain sm:h-16 sm:min-h-[60px]" />
+              <img src="/images/logo.webp" alt="" width={160} height={100} className="h-14 w-auto min-h-[52px] object-contain sm:h-16 sm:min-h-[60px]" />
               <span className="hidden text-base font-semibold text-brand-dark sm:inline">עמוד ראשי</span>
             </Link>
             <button
