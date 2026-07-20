@@ -20,7 +20,7 @@ export function AppHeader({ backHref, backLabel, rightSlot }: AppHeaderProps) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/logo.webp"
+              src="/images/logo.webp?v=2"
               alt=""
               width={160}
               height={100}

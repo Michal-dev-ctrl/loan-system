@@ -11,7 +11,8 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
+            // בלי immutable – כדי שלא יישמר 404 ישן לתמיד אחרי עדכון תמונות
+            value: "public, max-age=86400, stale-while-revalidate=604800",
           },
         ],
       },

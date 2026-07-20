@@ -273,7 +273,7 @@ export default function SummaryPage() {
           <div className="flex justify-center mb-4 print:mb-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/logo.webp"
+              src="/images/logo.webp?v=2"
               alt="גמ״ח אור לכלה שמחת יום טוב"
               className="h-20 w-auto object-contain print:h-14 print:max-w-[200px]"
             />
