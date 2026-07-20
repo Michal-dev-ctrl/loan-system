@@ -33,11 +33,18 @@ export function formatDisplayDate(iso: string): string {
  */
 export function formatHebrewDateShort(iso: string): string {
   if (!iso || iso.length < 10) return "";
-  const [y, m, day] = iso.slice(0, 10).split("-").map(Number);
-  const greg = new Date(y, m - 1, day);
-  const weekday = WEEKDAY_NAMES[greg.getDay()];
-  const hd = new HDate(greg);
-  const hebrewDay = gematriya(hd.getDay());
-  const monthName = HEBREW_MONTH_NAMES[hd.getMonth()] ?? "";
-  return `${weekday}, ${hebrewDay} ${monthName}`;
+  try {
+    const [y, m, day] = iso.slice(0, 10).split("-").map(Number);
+    if (!y || !m || !day) return "";
+    const greg = new Date(y, m - 1, day);
+    if (Number.isNaN(greg.getTime())) return "";
+    const weekday = WEEKDAY_NAMES[greg.getDay()] ?? "";
+    const hd = new HDate(greg);
+    // getDate() = יום בחודש העברי; getDay() = יום בשבוע (0=ראשון) וגורם לקריסה ב־gematriya(0)
+    const hebrewDay = gematriya(hd.getDate());
+    const monthName = HEBREW_MONTH_NAMES[hd.getMonth()] ?? hd.getMonthName();
+    return `${weekday}, ${hebrewDay} ${monthName}`;
+  } catch {
+    return "";
+  }
 }
