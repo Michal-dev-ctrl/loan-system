@@ -1,55 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useRentalDraft } from "../RentalContext";
 import { catalog } from "../items/catalog";
 import { AppHeader } from "../../components/AppHeader";
 import { formatDisplayDate, formatHebrewDateShort } from "../../../lib/formatDate";
-
-type SavedRental = {
-  id: string;
-  createdAt: string;
-  personal: typeof draftSample.personal;
-  deposit: typeof draftSample.deposit;
-  dates: typeof draftSample.dates;
-  items: typeof draftSample.items;
-  totals: {
-    donation: number;
-    depositAmount: number;
-    purchaseTotal: number;
-    rentalTotal: number;
-    totalToPayNow: number;
-  };
-  // הערות חופשיות על ההזמנה (ציוד אחר, הוראות מיוחדות וכו')
-  notes?: string;
-  // חיוב נוסף שאינו מופיע ברשימת הציוד (לדוגמה מוצר משלים)
-  extraChargeAmount?: number;
-};
-
-const draftSample = {
-  personal: {
-    firstName: "",
-    lastName: "",
-    phone1: "",
-    phone2: "",
-  },
-  deposit: {
-    option: null as "cheque" | "cash" | null,
-    chequeName: "",
-    chequeNumber: "",
-    depositAmount: 0,
-    donationAmount: 0,
-  },
-  dates: {
-    pickupDate: "",
-    returnDate: "",
-  },
-  items: {} as Record<string, number>,
-};
-
-const STORAGE_KEY = "event_rentals";
+import { createRentalApi, updateRentalApi } from "../../../lib/rentals/client";
+import type { SavedRental } from "../../../lib/rentals/types";
 
 const EMAIL_DOMAINS = [
   "gmail.com",
@@ -77,6 +35,8 @@ export default function SummaryPage() {
   const [emailSendMessage, setEmailSendMessage] = useState<"success" | "error" | null>(null);
   const [notes, setNotes] = useState("");
   const [extraChargeAmount, setExtraChargeAmount] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const donation = draft.deposit.donationAmount;
   const depositAmount = draft.deposit.depositAmount;
@@ -143,57 +103,46 @@ export default function SummaryPage() {
     }
   }, [draft.personal.firstName, draft.personal.lastName, router]);
 
-  const saveRental = (): SavedRental | null => {
+  const buildRentalPayload = () => ({
+    personal: draft.personal,
+    deposit: draft.deposit,
+    dates: draft.dates,
+    items: draft.items,
+    totals: {
+      donation,
+      depositAmount,
+      purchaseTotal,
+      rentalTotal: effectiveRentalTotal,
+      totalToPayNow,
+    },
+    notes: notes.trim() || undefined,
+    extraChargeAmount: extraChargeAmount > 0 ? extraChargeAmount : undefined,
+  });
+
+  const saveRental = async (): Promise<SavedRental | null> => {
+    setSaveError(null);
+    setIsSaving(true);
     try {
-      const existingRaw =
-        typeof window !== "undefined"
-          ? window.localStorage.getItem(STORAGE_KEY)
-          : null;
-      const existing: SavedRental[] = existingRaw ? JSON.parse(existingRaw) : [];
-
-      const numericCount = existing.filter((rental) => {
-        const num = parseInt(rental.id, 10);
-        return !Number.isNaN(num) && num > 0;
-      }).length;
-
-      const nextNumber = numericCount + 1;
-      const id = String(nextNumber);
-
-      const rental: SavedRental = {
-        id,
-        createdAt: new Date().toISOString(),
-        personal: draft.personal,
-        deposit: draft.deposit,
-        dates: draft.dates,
-        items: draft.items,
-        totals: {
-          donation,
-          depositAmount,
-          purchaseTotal,
-          rentalTotal,
-          totalToPayNow,
-        },
-        notes: notes.trim() || undefined,
-        extraChargeAmount: extraChargeAmount > 0 ? extraChargeAmount : undefined,
-      };
-
-      existing.push(rental);
-
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
-      }
-
-      setSavedId(id);
-      // לא מאפסים את הטופס – נשארים בעמוד עם כל הפרטים להדפסה/שליחה
+      const payload = buildRentalPayload();
+      const rental = savedId
+        ? await updateRentalApi(savedId, payload)
+        : await createRentalApi(payload);
+      setSavedId(rental.id);
       return rental;
-    } catch {
-      // ignore storage errors in demo
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "שמירת ההזמנה נכשלה";
+      setSaveError(message);
+      alert(message);
       return null;
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleSaveAndPrint = () => {
-    saveRental();
+  const handleSaveAndPrint = async () => {
+    const rental = await saveRental();
+    if (!rental) return;
     setTimeout(() => {
       if (typeof window !== "undefined") {
         window.print();
@@ -253,7 +202,7 @@ export default function SummaryPage() {
   };
 
   const handleSaveAndEmail = async () => {
-    const rental = saveRental();
+    const rental = await saveRental();
     if (!rental) return;
     const text = buildReceiptText(rental);
     if (typeof window === "undefined") return;
@@ -302,9 +251,10 @@ export default function SummaryPage() {
     }
   };
 
-  const handleFinish = () => {
-    const rental = saveRental();
+  const handleFinish = async () => {
+    const rental = await saveRental();
     if (!rental) return;
+    resetDraft();
     router.push("/rental/confirmation");
   };
 
@@ -323,7 +273,7 @@ export default function SummaryPage() {
           <div className="flex justify-center mb-4 print:mb-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/logo.png"
+              src="/images/logo.webp"
               alt="גמ״ח אור לכלה שמחת יום טוב"
               className="h-20 w-auto object-contain print:h-14 print:max-w-[200px]"
             />
@@ -337,8 +287,13 @@ export default function SummaryPage() {
 
           {savedId && (
             <p className="mt-4 text-center text-sm font-medium text-brand-dark">
-              ההשכרה נשמרה בהצלחה. מספר הזמנה:{" "}
+              ההשכרה נשמרה בהצלחה בשרת. מספר הזמנה:{" "}
               <span className="font-semibold">{savedId}</span>
+            </p>
+          )}
+          {saveError && (
+            <p className="mt-2 text-center text-sm font-medium text-red-600">
+              {saveError}
             </p>
           )}
 
@@ -544,9 +499,10 @@ export default function SummaryPage() {
             <button
               type="button"
               onClick={handleSaveAndPrint}
-              className="w-full rounded-xl border-2 border-zinc-200 bg-white py-3 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-colors"
+              disabled={isSaving}
+              className="w-full rounded-xl border-2 border-zinc-200 bg-white py-3 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-colors disabled:opacity-70"
             >
-              שמירה + הדפסה
+              {isSaving ? "שומר…" : "שמירה + הדפסה"}
             </button>
 
             <div className="space-y-3">
@@ -618,19 +574,20 @@ export default function SummaryPage() {
               <button
                 type="button"
                 onClick={handleSaveAndEmail}
-                disabled={isSendingEmail}
+                disabled={isSendingEmail || isSaving}
                 className="w-full rounded-xl bg-brand py-2.5 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(200,90,108,0.25)] hover:bg-brand-dark transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {isSendingEmail ? "שולח מייל…" : "שמירה + שליחת קבלה"}
+                {isSendingEmail || isSaving ? "שומר / שולח…" : "שמירה + שליחת קבלה"}
               </button>
             </div>
 
             <button
               type="button"
               onClick={handleFinish}
-              className="w-full rounded-xl bg-brand py-3.5 text-center text-sm font-bold text-white shadow-[0_2px_12px_rgba(200,90,108,0.35)] hover:bg-brand-dark transition-colors mt-1"
+              disabled={isSaving}
+              className="w-full rounded-xl bg-brand py-3.5 text-center text-sm font-bold text-white shadow-[0_2px_12px_rgba(200,90,108,0.35)] hover:bg-brand-dark transition-colors mt-1 disabled:opacity-70"
             >
-              סיום ההזמנה
+              {isSaving ? "שומר…" : "סיום ההזמנה"}
             </button>
           </div>
         </section>

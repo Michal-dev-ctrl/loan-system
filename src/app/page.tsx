@@ -15,7 +15,7 @@ export default function Home() {
             <div className="mt-6 w-full flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/images/logo.png"
+                src="/images/logo.webp"
                 alt="לוגו העמותה"
                 width={420}
                 height={260}

@@ -1,46 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AppHeader } from "../../components/AppHeader";
 import { catalog } from "../../rental/items/catalog";
 import { formatDisplayDate, formatHebrewDateShort } from "../../../lib/formatDate";
-
-type SavedRental = {
-  id: string;
-  createdAt: string;
-  personal: {
-    firstName: string;
-    lastName: string;
-    phone1: string;
-    phone2: string;
-  };
-  deposit: {
-    option: "cheque" | "cash" | null;
-    chequeName: string;
-    chequeNumber: string;
-    depositAmount: number;
-    donationAmount: number;
-  };
-  dates: {
-    pickupDate: string;
-    returnDate: string;
-  };
-  items: Record<string, number>;
-  totals: {
-    donation: number;
-    depositAmount: number;
-    purchaseTotal: number;
-    totalToPayNow: number;
-  };
-  // מצב החזרה – אופציונלי, נשמר בדפדפן
-  returnCompleted?: boolean;
-  // הערות חופשיות מההזמנה (ציוד אחר, הוראות מיוחדות וכו')
-  notes?: string;
-  // חיוב נוסף שסוכם בהזמנה (אופציונלי)
-  extraChargeAmount?: number;
-};
+import { fetchRental, updateRentalApi } from "../../../lib/rentals/client";
+import type { SavedRental } from "../../../lib/rentals/types";
 
 type CatalogEntry = {
   id: string;
@@ -48,8 +14,6 @@ type CatalogEntry = {
   kind: "rental" | "purchase";
   damagePrice: number;
 };
-
-const STORAGE_KEY = "event_rentals";
 
 // רשימת פריטים להשכרה – חייבת להתאים ל-id-ים מעמוד בחירת הציוד
 const DAMAGE_CATALOG: CatalogEntry[] = [
@@ -82,6 +46,8 @@ const DAMAGE_CATALOG: CatalogEntry[] = [
   { id: "happy-flower-chains-1", name: "שרשראות פרחים – פשוט", kind: "rental", damagePrice: 4 },
   { id: "happy-flower-chains-2", name: "שרשראות פרחים – יקר", kind: "rental", damagePrice: 15 },
   { id: "happy-hoop-threads", name: "חישוק צבעוני עם חוטים", kind: "rental", damagePrice: 10 },
+  { id: "happy-glasses-light", name: "משקפיים / קשתות עם אורות", kind: "rental", damagePrice: 25 },
+  { id: "happy-glasses-no-light", name: "משקפיים / קשתות ללא אורות", kind: "rental", damagePrice: 15 },
   { id: "extra-chuppah-kit", name: "מזוודת חופה", kind: "rental", damagePrice: 60 },
 ];
 
@@ -99,22 +65,13 @@ const CHUPPAH_INNER_ITEMS: { id: string; name: string; price: number }[] = [
   { id: "chuppah-sewing", name: "ערכת תפירה", price: 15 },
 ];
 
-function loadRentals(): SavedRental[] {
-  if (typeof window === "undefined") return [];
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw) as SavedRental[];
-  } catch {
-    return [];
-  }
-}
-
 export default function ReturnPage() {
   const router = useRouter();
   const params = useParams();
   const rentalId = params?.id ? decodeURIComponent(String(params.id)) : "";
   const [rental, setRental] = useState<SavedRental | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [returnedQuantities, setReturnedQuantities] = useState<Record<string, number>>({});
   const [damageTotal, setDamageTotal] = useState(0);
@@ -124,32 +81,42 @@ export default function ReturnPage() {
   const [otherDamageAmount, setOtherDamageAmount] = useState(0);
 
   useEffect(() => {
-    const rentals = loadRentals();
-    const normalizedId = rentalId.trim();
-    let found =
-      rentals.find((r) => String(r.id).trim() === normalizedId) || null;
-
-    // ניסיון התאמה נוסף לפי מספר (למקרה של שונות בין טיפוס מספר/מחרוזת או נתונים ישנים)
-    if (!found) {
-      const numericId = parseInt(normalizedId, 10);
-      if (!Number.isNaN(numericId)) {
-        found =
-          rentals.find(
-            (r) =>
-              !Number.isNaN(parseInt(String(r.id), 10)) &&
-              parseInt(String(r.id), 10) === numericId,
-          ) ||
-          rentals[numericId - 1] ||
-          null;
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const found = await fetchRental(rentalId);
+        if (cancelled) return;
+        setRental(found);
+        if (found?.returnCompleted) {
+          setCompleted(true);
+        }
+        if (found?.returnDetails) {
+          setReturnedQuantities(found.returnDetails.returnedQuantities || {});
+          setChuppahReturned(found.returnDetails.chuppahReturned || {});
+          setOtherDamageName(found.returnDetails.otherDamageName || "");
+          setOtherDamageAmount(found.returnDetails.otherDamageAmount || 0);
+          setDamageTotal(found.returnDetails.damageTotal || 0);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setRental(null);
+          setLoadError(err instanceof Error ? err.message : "שגיאה בטעינת ההזמנה");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
-
-    // אם עדיין לא נמצא – נ fallback להזמנה האחרונה ברשימה, כדי שהעמוד תמיד יציג משהו
-    if (!found && rentals.length > 0) {
-      found = rentals[rentals.length - 1];
+    if (rentalId) {
+      void load();
+    } else {
+      setLoading(false);
+      setRental(null);
     }
-
-    setRental(found);
+    return () => {
+      cancelled = true;
+    };
   }, [rentalId]);
 
   const orderedItems = useMemo(() => {
@@ -167,17 +134,15 @@ export default function ReturnPage() {
     }));
   }, [rental]);
 
-  // אתחול כמויות מוחזרות – ברירת מחדל: הכול הוחזר
+  // אתחול כמויות מוחזרות – ברירת מחדל: הכול הוחזר (רק אם אין פרטי החזרה שמורים)
   useEffect(() => {
-    if (!rental) return;
+    if (!rental || rental.returnDetails) return;
     const initial: Record<string, number> = {};
     itemsForReturn.forEach((item) => {
       initial[item.id] = item.quantity;
     });
     setReturnedQuantities(initial);
   }, [rental, itemsForReturn]);
-
-  const allStatusesFilled = itemsForReturn.length > 0;
 
   const setReturnedQuantity = (itemId: string, value: number, max: number) => {
     const clamped = Math.max(0, Math.min(max, value));
@@ -285,30 +250,44 @@ export default function ReturnPage() {
     return [...mainItems, ...chuppahInner, ...extraLine];
   }, [itemsForReturn, returnedQuantities, chuppahReturned, otherDamageName, otherDamageAmount]);
 
-  const handleComplete = (e: React.FormEvent) => {
+  const handleComplete = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rental || !allStatusesFilled || saving) return;
+    if (!rental || saving) return;
     setSaving(true);
-    setCompleted(true);
 
-    // סימון ההחזרה כהושלמה – שומרים לפי ההזמנה המוצגת (rental.id) כדי שלא יהיה אי-התאמה
-    const idToMark = String(rental.id).trim();
-    if (typeof window !== "undefined") {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      const rentals: SavedRental[] = raw ? JSON.parse(raw) : [];
-      const updated = rentals.map((r) => {
-        const rid = String(r.id).trim();
-        const numR = parseInt(rid, 10);
-        const numM = parseInt(idToMark, 10);
-        const match = rid === idToMark || (!Number.isNaN(numR) && !Number.isNaN(numM) && numR === numM);
-        return match ? { ...r, returnCompleted: true } : r;
+    try {
+      await updateRentalApi(rental.id, {
+        returnCompleted: true,
+        returnDetails: {
+          completedAt: new Date().toISOString(),
+          returnedQuantities,
+          chuppahReturned,
+          otherDamageName: otherDamageName.trim() || undefined,
+          otherDamageAmount: otherDamageAmount > 0 ? otherDamageAmount : undefined,
+          damageTotal,
+          damageBreakdown,
+        },
       });
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      setCompleted(true);
+      setTimeout(() => router.push("/search"), 350);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "שמירת ההחזרה נכשלה");
+      setSaving(false);
     }
-
-    // מעבר רק אחרי שהשמירה הושלמה + זמן לדפדפן לכתוב
-    setTimeout(() => router.push("/search"), 350);
   };
+
+  if (loading) {
+    return (
+      <div className="app-page text-foreground">
+        <AppHeader backHref="/search" backLabel="לחיפוש" />
+        <main className="mx-auto max-w-xl px-4 py-10 text-right">
+          <div className="rounded-2xl border border-brand-soft/60 bg-white p-6 shadow-[0_4px_20px_rgba(200,90,108,0.08)]">
+            <p className="text-sm text-zinc-600">טוען הזמנה מהשרת…</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (!rental) {
     return (
@@ -318,8 +297,8 @@ export default function ReturnPage() {
           <div className="rounded-2xl border border-brand-soft/60 bg-white p-6 shadow-[0_4px_20px_rgba(200,90,108,0.08)]">
             <h1 className="text-2xl font-bold text-brand">החזרה לא נמצאה</h1>
             <p className="mt-2 text-sm text-zinc-600">
-              לא נמצאה השכרה עם מספר הזמנה הזה. חזרו לעמוד החיפוש
-              ונסו שוב.
+              {loadError ||
+                "לא נמצאה השכרה עם מספר הזמנה הזה. חזרו לעמוד החיפוש ונסו שוב."}
             </p>
           </div>
         </main>
@@ -327,7 +306,11 @@ export default function ReturnPage() {
     );
   }
 
-  const depositPaid = rental.deposit.depositAmount || rental.totals.depositAmount || 0;
+  // צ'ק פיקדון נשמר כ-0 בתשלום עכשיו, אבל הערך המוחזק הוא 1000 ₪
+  const depositPaid =
+    rental.deposit.option === "cheque"
+      ? 1000
+      : rental.deposit.depositAmount || rental.totals.depositAmount || 0;
 
   return (
     <div className="app-page text-foreground">
@@ -338,7 +321,7 @@ export default function ReturnPage() {
           <div className="flex justify-center mb-4 print:mb-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/logo.png"
+              src="/images/logo.webp"
               alt="גמ״ח אור לכלה שמחת יום טוב"
               className="h-20 w-auto object-contain print:h-14 print:max-w-[200px]"
             />
@@ -642,20 +625,19 @@ export default function ReturnPage() {
           <div className="flex gap-3 pt-3">
             <button
               type="submit"
-              disabled={itemsForReturn.length === 0 || saving}
+              disabled={saving || completed}
               className="flex-1 rounded-xl bg-brand py-2.5 text-center text-xs font-semibold text-white shadow-[0_2px_8px_rgba(200,90,108,0.3)] hover:bg-brand-dark disabled:opacity-60"
             >
-              {saving ? "שומר… מעביר להחזרות" : "סיום ושמירת החזרה"}
+              {saving ? "שומר… מעביר להחזרות" : completed ? "ההחזרה נשמרה" : "סיום ושמירת החזרה"}
             </button>
             <button
               type="button"
-              disabled={itemsForReturn.length === 0}
               onClick={() => {
                 if (typeof window !== "undefined") {
                   window.print();
                 }
               }}
-              className="flex-1 rounded-xl border border-zinc-200 bg-white py-2.5 text-center text-xs font-medium hover:bg-zinc-50 disabled:opacity-60"
+              className="flex-1 rounded-xl border border-zinc-200 bg-white py-2.5 text-center text-xs font-medium hover:bg-zinc-50"
             >
               הדפסת קבלה מעודכנת
             </button>
@@ -663,7 +645,7 @@ export default function ReturnPage() {
 
           {completed && (
             <p className="text-xs font-medium text-brand-dark">
-              ההחזרה עודכנה (במצב הדגמה – המידע נשמר בדפדפן בלבד).
+              ההחזרה נשמרה בשרת ותופיע בכל המחשבים.
             </p>
           )}
         </form>
