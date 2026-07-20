@@ -39,10 +39,9 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ rental });
   } catch (error) {
     console.error("PATCH /api/rentals/[id] failed", error);
-    return NextResponse.json(
-      { error: "שגיאה בעדכון ההזמנה" },
-      { status: 500 },
-    );
+    const message =
+      error instanceof Error ? error.message : "שגיאה בעדכון ההזמנה";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -56,9 +55,8 @@ export async function DELETE(_request: Request, { params }: Params) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/rentals/[id] failed", error);
-    return NextResponse.json(
-      { error: "שגיאה במחיקת ההזמנה" },
-      { status: 500 },
-    );
+    const message =
+      error instanceof Error ? error.message : "שגיאה במחיקת ההזמנה";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
