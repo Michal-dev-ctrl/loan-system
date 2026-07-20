@@ -25,6 +25,7 @@ export default function SearchPage() {
   const [localPending, setLocalPending] = useState<SavedRental[]>([]);
   const [migrating, setMigrating] = useState(false);
   const [needsBlobSetup, setNeedsBlobSetup] = useState(false);
+  const [autoMigrateNote, setAutoMigrateNote] = useState<string | null>(null);
 
   const applyFilter = useCallback((rentals: SavedRental[], termRaw: string) => {
     const term = termRaw.trim().toLowerCase();
@@ -46,13 +47,47 @@ export default function SearchPage() {
     setError(null);
     try {
       const data = await fetchRentals();
-      setAllRentals(data.rentals);
-      setResults(applyFilter(data.rentals, term));
+      let rentals = data.rentals;
+      const durable = Boolean(data.store?.durable) && !data.store?.needsBlobSetup;
       setNeedsBlobSetup(Boolean(data.store?.needsBlobSetup));
+
+      // העברה אוטומטית של הזמנות ישנות מהדפדפן לשרת (בלי לשאול)
+      const local = readLocalRentals();
+      if (durable && local.length > 0) {
+        setMigrating(true);
+        try {
+          const result = await migrateLocalRentals(local);
+          clearLocalRentals();
+          setLocalPending([]);
+          const refreshed = await fetchRentals();
+          rentals = refreshed.rentals;
+          if (result.imported > 0) {
+            setAutoMigrateNote(
+              `הועברו אוטומטית ${result.imported} הזמנות ישנות לשרת` +
+                (result.skipped ? ` (${result.skipped} כבר היו קיימות)` : ""),
+            );
+          } else {
+            setAutoMigrateNote(null);
+          }
+        } catch {
+          setLocalPending(local);
+          setAutoMigrateNote(null);
+        } finally {
+          setMigrating(false);
+        }
+      } else if (!durable) {
+        setLocalPending(local);
+      } else {
+        setLocalPending([]);
+      }
+
+      setAllRentals(rentals);
+      setResults(applyFilter(rentals, term));
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה בטעינת הזמנות");
       setAllRentals([]);
       setResults([]);
+      setLocalPending(readLocalRentals());
     } finally {
       setLoading(false);
     }
@@ -61,11 +96,16 @@ export default function SearchPage() {
   useEffect(() => {
     if (pathname === "/search") {
       void loadFromServer(searchText);
-      setLocalPending(readLocalRentals());
     }
     // נטען מחדש רק בכניסה לעמוד, לא בכל הקלדה בחיפוש
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, loadFromServer]);
+
+  useEffect(() => {
+    if (!autoMigrateNote) return;
+    const t = setTimeout(() => setAutoMigrateNote(null), 6000);
+    return () => clearTimeout(t);
+  }, [autoMigrateNote]);
 
   const handleSearchChange = (value: string) => {
     setSearchText(value);
@@ -148,14 +188,26 @@ export default function SearchPage() {
             </div>
           )}
 
-          {localPending.length > 0 && (
+          {autoMigrateNote && (
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-right text-sm text-emerald-900">
+              {autoMigrateNote}
+            </div>
+          )}
+
+          {migrating && !autoMigrateNote && (
+            <div className="mt-4 rounded-xl border border-brand-soft/60 bg-brand-soft/20 p-3 text-right text-sm text-brand-dark">
+              מעביר הזמנות ישנות לשרת אוטומטית…
+            </div>
+          )}
+
+          {localPending.length > 0 && needsBlobSetup && (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-right text-sm text-amber-900">
               <p className="font-semibold">
                 נמצאו {localPending.length} הזמנות ישנות במחשב הזה בלבד
               </p>
               <p className="mt-1 text-xs">
-                בעבר ההזמנות נשמרו רק בדפדפן. אפשר להעביר אותן עכשיו לשרת כדי
-                שיופיעו גם במחשבים אחרים.
+                אחרי חיבור Blob הן יועברו אוטומטית לשרת. בינתיים אפשר גם להעביר
+                ידנית אם האחסון כבר מחובר.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -189,6 +241,24 @@ export default function SearchPage() {
               <p className="mt-2 text-[11px] text-amber-800/80">
                 מפתח ישן בדפדפן: {LOCAL_STORAGE_KEY}
               </p>
+            </div>
+          )}
+
+          {localPending.length > 0 && !needsBlobSetup && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-right text-sm text-amber-900">
+              <p className="font-semibold">
+                נמצאו {localPending.length} הזמנות ישנות שלא הועברו אוטומטית
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleMigrateLocal}
+                  disabled={migrating}
+                  className="rounded-xl bg-brand px-3 py-2 text-xs font-semibold text-white hover:bg-brand-dark disabled:opacity-70"
+                >
+                  {migrating ? "מעביר…" : "העברה לשרת"}
+                </button>
+              </div>
             </div>
           )}
 
