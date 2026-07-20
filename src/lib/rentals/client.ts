@@ -12,51 +12,201 @@ async function parseJson<T>(res: Response): Promise<T> {
   return data;
 }
 
-export async function fetchRentals(): Promise<SavedRental[]> {
-  const res = await fetch("/api/rentals", { cache: "no-store" });
-  const data = await parseJson<{ rentals: SavedRental[] }>(res);
-  return data.rentals || [];
+function isCloudStorageMissingError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("blob") ||
+    lower.includes("erofs") ||
+    lower.includes("read-only") ||
+    message.includes("Vercel Blob")
+  );
+}
+
+function writeLocalRentals(rentals: SavedRental[]): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(rentals));
+}
+
+function nextLocalId(existing: SavedRental[]): string {
+  const maxId = existing.reduce((max, rental) => {
+    const num = parseInt(String(rental.id), 10);
+    return !Number.isNaN(num) && num > max ? num : max;
+  }, 0);
+  return String(maxId + 1);
+}
+
+function saveLocalCreate(
+  input: Omit<SavedRental, "id" | "createdAt"> & { id?: string },
+): SavedRental {
+  const existing = readLocalRentals();
+  const id = input.id?.trim() || nextLocalId(existing);
+  const rental: SavedRental = {
+    ...input,
+    id,
+    createdAt: new Date().toISOString(),
+  };
+  existing.push(rental);
+  writeLocalRentals(existing);
+  return rental;
+}
+
+function saveLocalUpdate(
+  id: string,
+  patch: UpdateRentalInput,
+): SavedRental | null {
+  const existing = readLocalRentals();
+  const index = existing.findIndex((r) => String(r.id).trim() === id.trim());
+  if (index < 0) return null;
+  const updated: SavedRental = {
+    ...existing[index],
+    ...patch,
+    id: existing[index].id,
+    createdAt: existing[index].createdAt,
+  };
+  existing[index] = updated;
+  writeLocalRentals(existing);
+  return updated;
+}
+
+export async function fetchRentals(): Promise<{
+  rentals: SavedRental[];
+  store?: {
+    backend: string;
+    durable: boolean;
+    needsBlobSetup?: boolean;
+  };
+}> {
+  let serverRentals: SavedRental[] = [];
+  let store:
+    | {
+        backend: string;
+        durable: boolean;
+        needsBlobSetup?: boolean;
+      }
+    | undefined;
+
+  try {
+    const res = await fetch("/api/rentals", { cache: "no-store" });
+    const data = await parseJson<{
+      rentals: SavedRental[];
+      store?: {
+        backend: string;
+        durable: boolean;
+        needsBlobSetup?: boolean;
+      };
+    }>(res);
+    serverRentals = data.rentals || [];
+    store = data.store;
+  } catch {
+    store = {
+      backend: "local",
+      durable: false,
+      needsBlobSetup: true,
+    };
+  }
+
+  const localRentals = readLocalRentals();
+  const byId = new Map<string, SavedRental>();
+  for (const rental of [...serverRentals, ...localRentals]) {
+    byId.set(String(rental.id).trim(), rental);
+  }
+
+  const rentals = Array.from(byId.values()).sort((a, b) => {
+    const da = new Date(a.createdAt).getTime();
+    const db = new Date(b.createdAt).getTime();
+    if (!Number.isNaN(da) && !Number.isNaN(db) && da !== db) return db - da;
+    return Number(b.id) - Number(a.id);
+  });
+
+  return { rentals, store };
 }
 
 export async function fetchRental(id: string): Promise<SavedRental | null> {
-  const res = await fetch(`/api/rentals/${encodeURIComponent(id)}`, {
-    cache: "no-store",
-  });
-  if (res.status === 404) return null;
-  const data = await parseJson<{ rental: SavedRental }>(res);
-  return data.rental;
+  try {
+    const res = await fetch(`/api/rentals/${encodeURIComponent(id)}`, {
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await parseJson<{ rental: SavedRental }>(res);
+      return data.rental;
+    }
+  } catch {
+    // fallback below
+  }
+  const local = readLocalRentals().find(
+    (r) => String(r.id).trim() === String(id).trim(),
+  );
+  return local || null;
 }
 
 export async function createRentalApi(
   rental: Omit<SavedRental, "id" | "createdAt"> & { id?: string },
 ): Promise<SavedRental> {
-  const res = await fetch("/api/rentals", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(rental),
-  });
-  const data = await parseJson<{ rental: SavedRental }>(res);
-  return data.rental;
+  try {
+    const res = await fetch("/api/rentals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(rental),
+    });
+    const data = await parseJson<{ rental: SavedRental }>(res);
+    return data.rental;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (isCloudStorageMissingError(message)) {
+      return saveLocalCreate(rental);
+    }
+    throw error;
+  }
 }
 
 export async function updateRentalApi(
   id: string,
   patch: UpdateRentalInput,
 ): Promise<SavedRental> {
-  const res = await fetch(`/api/rentals/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  const data = await parseJson<{ rental: SavedRental }>(res);
-  return data.rental;
+  try {
+    const res = await fetch(`/api/rentals/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    const data = await parseJson<{ rental: SavedRental }>(res);
+    return data.rental;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (isCloudStorageMissingError(message)) {
+      const updated = saveLocalUpdate(id, patch);
+      if (updated) return updated;
+      // אם אין מקומית – צרי כחדשה עם אותו id
+      return saveLocalCreate({ ...(patch as SavedRental), id });
+    }
+    throw error;
+  }
 }
 
 export async function deleteRentalApi(id: string): Promise<void> {
-  const res = await fetch(`/api/rentals/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-  });
-  await parseJson<{ success: boolean }>(res);
+  let serverFailedForStorage = false;
+  try {
+    const res = await fetch(`/api/rentals/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    await parseJson<{ success: boolean }>(res);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (isCloudStorageMissingError(message)) {
+      serverFailedForStorage = true;
+    } else if (!message.includes("404") && !message.includes("לא נמצאה")) {
+      throw error;
+    }
+  }
+
+  const next = readLocalRentals().filter(
+    (r) => String(r.id).trim() !== String(id).trim(),
+  );
+  writeLocalRentals(next);
+
+  if (serverFailedForStorage) {
+    // נמחקה מקומית – מספיק כשאין Blob
+  }
 }
 
 export async function migrateLocalRentals(

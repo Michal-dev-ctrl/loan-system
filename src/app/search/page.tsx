@@ -24,6 +24,7 @@ export default function SearchPage() {
   const [error, setError] = useState<string | null>(null);
   const [localPending, setLocalPending] = useState<SavedRental[]>([]);
   const [migrating, setMigrating] = useState(false);
+  const [needsBlobSetup, setNeedsBlobSetup] = useState(false);
 
   const applyFilter = useCallback((rentals: SavedRental[], termRaw: string) => {
     const term = termRaw.trim().toLowerCase();
@@ -44,9 +45,10 @@ export default function SearchPage() {
     setLoading(true);
     setError(null);
     try {
-      const rentals = await fetchRentals();
-      setAllRentals(rentals);
-      setResults(applyFilter(rentals, term));
+      const data = await fetchRentals();
+      setAllRentals(data.rentals);
+      setResults(applyFilter(data.rentals, term));
+      setNeedsBlobSetup(Boolean(data.store?.needsBlobSetup));
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה בטעינת הזמנות");
       setAllRentals([]);
@@ -133,6 +135,18 @@ export default function SearchPage() {
           <p className="mt-2 text-center text-sm text-brand-dark">
             חיפוש לפי שם, טלפון או מספר הזמנה · הנתונים נשמרים בשרת לכל המחשבים
           </p>
+
+          {needsBlobSetup && (
+            <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-right text-sm text-amber-950">
+              <p className="font-semibold">לחיבור מלא בין מחשבים בענן</p>
+              <p className="mt-1 text-xs leading-relaxed">
+                כרגע השמירה עובדת במחשב הזה. כדי שכל המחשבים יראו את אותן הזמנות
+                ב־Vercel: Storage → Create → Blob Store → Connect לפרויקט{" "}
+                <span className="font-semibold">loan-system-gmach-or</span> → ואז
+                Redeploy.
+              </p>
+            </div>
+          )}
 
           {localPending.length > 0 && (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-right text-sm text-amber-900">
