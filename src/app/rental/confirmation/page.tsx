@@ -9,7 +9,7 @@ export default function ConfirmationPage() {
           ההזמנה נשמרה בהצלחה
         </h1>
         <p className="text-sm text-zinc-600 mb-4">
-          ניתן תמיד לחזור לרשימת ההשכרות והחזרות כדי לראות את הפרטים.
+          ההזמנה נשמרה בשרת ותופיע בכל המחשבים תחת חיפוש והשבת ציוד.
         </p>
         <a
           href="/"

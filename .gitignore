@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local rental data (server store when not using Vercel Blob)
+/data/rentals.json
+/data/rentals.json.tmp
+!/data/.gitkeep

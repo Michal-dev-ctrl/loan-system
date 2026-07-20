@@ -221,6 +221,20 @@ export const catalog: CatalogItem[] = [
     damageFee: 10,
   },
   {
+    id: "happy-glasses-light",
+    name: "משקפיים / קשתות עם אורות",
+    category: "fun",
+    price: 0,
+    damageFee: 25,
+  },
+  {
+    id: "happy-glasses-no-light",
+    name: "משקפיים / קשתות ללא אורות",
+    category: "fun",
+    price: 0,
+    damageFee: 15,
+  },
+  {
     id: "extra-chuppah-kit",
     name: "מזוודת חופה",
     category: "extra",
