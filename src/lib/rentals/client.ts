@@ -18,7 +18,10 @@ function isCloudStorageMissingError(message: string): boolean {
     lower.includes("blob") ||
     lower.includes("erofs") ||
     lower.includes("read-only") ||
-    message.includes("Vercel Blob")
+    message.includes("Vercel Blob") ||
+    message.includes("שגיאה בעדכון ההזמנה") ||
+    message.includes("שגיאה בשמירת ההזמנה") ||
+    message.includes("שגיאה במחיקת ההזמנה")
   );
 }
 
@@ -169,15 +172,36 @@ export async function updateRentalApi(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
+    if (res.status === 404) {
+      const localUpdated = saveLocalUpdate(id, patch);
+      if (localUpdated) return localUpdated;
+      throw new Error("הזמנה לא נמצאה");
+    }
     const data = await parseJson<{ rental: SavedRental }>(res);
     return data.rental;
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
+    if (message === "הזמנה לא נמצאה") throw error;
     if (isCloudStorageMissingError(message)) {
       const updated = saveLocalUpdate(id, patch);
       if (updated) return updated;
-      // אם אין מקומית – צרי כחדשה עם אותו id
-      return saveLocalCreate({ ...(patch as SavedRental), id });
+      if (patch.personal && patch.dates && patch.deposit && patch.totals) {
+        return saveLocalCreate({
+          personal: patch.personal,
+          deposit: patch.deposit,
+          dates: patch.dates,
+          items: patch.items || {},
+          totals: patch.totals,
+          notes: patch.notes,
+          extraChargeAmount: patch.extraChargeAmount,
+          returnCompleted: patch.returnCompleted,
+          returnDetails: patch.returnDetails,
+          id,
+        });
+      }
+      throw new Error(
+        "לא ניתן לעדכן את ההזמנה במחשב הזה. נסי לשמור מחדש את ההזמנה.",
+      );
     }
     throw error;
   }
