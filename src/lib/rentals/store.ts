@@ -4,12 +4,41 @@ import { get, put } from "@vercel/blob";
 import type { SavedRental } from "./types";
 
 const BLOB_PATH = "loan-system/rentals.json";
-const FILE_PATH = path.join(process.cwd(), "data", "rentals.json");
 
 type StoreBackend = "blob" | "file";
 
+type GlobalRentalsCache = {
+  rentals: SavedRental[] | null;
+};
+
+function getMemoryCache(): GlobalRentalsCache {
+  const g = globalThis as typeof globalThis & {
+    __loanRentalsCache?: GlobalRentalsCache;
+  };
+  if (!g.__loanRentalsCache) {
+    g.__loanRentalsCache = { rentals: null };
+  }
+  return g.__loanRentalsCache;
+}
+
+function isVercelRuntime(): boolean {
+  return process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
+}
+
+function hasBlobToken(): boolean {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+}
+
 function getBackend(): StoreBackend {
-  return process.env.BLOB_READ_WRITE_TOKEN ? "blob" : "file";
+  return hasBlobToken() ? "blob" : "file";
+}
+
+/** ב־Vercel מערכת הקבצים לקריאה בלבד – שומרים ב־/tmp */
+function getFilePath(): string {
+  if (isVercelRuntime()) {
+    return path.join("/tmp", "loan-system-rentals.json");
+  }
+  return path.join(process.cwd(), "data", "rentals.json");
 }
 
 async function readFromBlob(): Promise<SavedRental[]> {
@@ -23,7 +52,6 @@ async function readFromBlob(): Promise<SavedRental[]> {
     const parsed = JSON.parse(text) as SavedRental[];
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
-    // Blob עדיין לא קיים / ריק – מתחילים מרשימה ריקה
     if (
       error instanceof Error &&
       (error.name === "BlobNotFoundError" ||
@@ -44,33 +72,49 @@ async function writeToBlob(rentals: SavedRental[]): Promise<void> {
   });
 }
 
-async function ensureDataDir(): Promise<void> {
-  await fs.mkdir(path.dirname(FILE_PATH), { recursive: true });
-}
-
 async function readFromFile(): Promise<SavedRental[]> {
+  const cache = getMemoryCache();
+  if (cache.rentals) {
+    return cache.rentals;
+  }
+
+  const filePath = getFilePath();
   try {
-    const raw = await fs.readFile(FILE_PATH, "utf8");
-    if (!raw.trim()) return [];
+    const raw = await fs.readFile(filePath, "utf8");
+    if (!raw.trim()) {
+      cache.rentals = [];
+      return [];
+    }
     const parsed = JSON.parse(raw) as SavedRental[];
-    return Array.isArray(parsed) ? parsed : [];
+    const rentals = Array.isArray(parsed) ? parsed : [];
+    cache.rentals = rentals;
+    return rentals;
   } catch (error) {
     const err = error as NodeJS.ErrnoException;
-    if (err.code === "ENOENT") return [];
+    if (err.code === "ENOENT") {
+      cache.rentals = [];
+      return [];
+    }
     throw error;
   }
 }
 
 async function writeToFile(rentals: SavedRental[]): Promise<void> {
-  await ensureDataDir();
-  const tmpPath = `${FILE_PATH}.tmp`;
+  const filePath = getFilePath();
+  const dir = path.dirname(filePath);
+  await fs.mkdir(dir, { recursive: true });
+  const tmpPath = `${filePath}.tmp`;
   await fs.writeFile(tmpPath, JSON.stringify(rentals, null, 2), "utf8");
-  await fs.rename(tmpPath, FILE_PATH);
+  await fs.rename(tmpPath, filePath);
+  getMemoryCache().rentals = rentals;
 }
 
 export async function listRentals(): Promise<SavedRental[]> {
   const rentals =
     getBackend() === "blob" ? await readFromBlob() : await readFromFile();
+  if (getBackend() === "blob") {
+    getMemoryCache().rentals = rentals;
+  }
   return [...rentals].sort((a, b) => {
     const da = new Date(a.createdAt).getTime();
     const db = new Date(b.createdAt).getTime();
@@ -108,14 +152,32 @@ function nextRentalId(rentals: SavedRental[]): string {
 async function saveAll(rentals: SavedRental[]): Promise<void> {
   if (getBackend() === "blob") {
     await writeToBlob(rentals);
-  } else {
+    getMemoryCache().rentals = rentals;
+    return;
+  }
+
+  try {
     await writeToFile(rentals);
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    // אם עדיין EROFS – לפחות שומרים בזיכרון של השרת החם
+    if (err.code === "EROFS" || err.code === "EACCES") {
+      getMemoryCache().rentals = rentals;
+      if (isVercelRuntime() && !hasBlobToken()) {
+        throw new Error(
+          'השמירה בענן דורשת Vercel Blob. ב־Vercel: Storage → Create → Blob Store → חברי לפרויקט loan-system-gmach-or, ואז Redeploy.',
+        );
+      }
+      throw new Error("לא ניתן לשמור לקובץ בשרת. נסי שוב או בדקי הרשאות.");
+    }
+    throw error;
   }
 }
 
 export async function createRental(
   input: Omit<SavedRental, "id" | "createdAt"> & { id?: string },
 ): Promise<SavedRental> {
+  assertWritableOrExplain();
   const rentals = await listRentals();
   const id = input.id?.trim() || nextRentalId(rentals);
 
@@ -137,6 +199,7 @@ export async function updateRental(
   id: string,
   patch: Partial<Omit<SavedRental, "id" | "createdAt">>,
 ): Promise<SavedRental | null> {
+  assertWritableOrExplain();
   const rentals = await listRentals();
   const normalized = id.trim();
   const index = rentals.findIndex((r) => String(r.id).trim() === normalized);
@@ -154,6 +217,7 @@ export async function updateRental(
 }
 
 export async function deleteRental(id: string): Promise<boolean> {
+  assertWritableOrExplain();
   const rentals = await listRentals();
   const normalized = id.trim();
   const next = rentals.filter((r) => String(r.id).trim() !== normalized);
@@ -166,6 +230,7 @@ export async function upsertMany(incoming: SavedRental[]): Promise<{
   imported: number;
   skipped: number;
 }> {
+  assertWritableOrExplain();
   const rentals = await listRentals();
   const byId = new Map(rentals.map((r) => [String(r.id).trim(), r]));
   let imported = 0;
@@ -189,11 +254,24 @@ export async function upsertMany(incoming: SavedRental[]): Promise<{
   return { imported, skipped };
 }
 
-export function getStoreInfo(): { backend: StoreBackend; durable: boolean } {
+function assertWritableOrExplain(): void {
+  if (isVercelRuntime() && !hasBlobToken()) {
+    throw new Error(
+      "כדי לשמור הזמנות בענן צריך לחבר Vercel Blob פעם אחת: באתר vercel.com פתחי את הפרויקט loan-system-gmach-or → Storage → Create → Blob Store → Connect to project → ואז Redeploy. אחר כך השמירה תעבוד בין כל המחשבים.",
+    );
+  }
+}
+
+export function getStoreInfo(): {
+  backend: StoreBackend;
+  durable: boolean;
+  needsBlobSetup: boolean;
+} {
   const backend = getBackend();
+  const needsBlobSetup = isVercelRuntime() && !hasBlobToken();
   return {
     backend,
-    // File storage is durable on a persistent Node host; Blob is durable on Vercel.
-    durable: backend === "blob" || process.env.VERCEL !== "1",
+    durable: backend === "blob" || !isVercelRuntime(),
+    needsBlobSetup,
   };
 }
