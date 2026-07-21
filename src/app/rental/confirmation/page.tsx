@@ -1,45 +1,79 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useRentalDraft } from "../RentalContext";
 
-export default function ConfirmationPage() {
-  const router = useRouter();
+function ConfirmationContent() {
+  const searchParams = useSearchParams();
   const { resetDraft } = useRentalDraft();
+  const orderId = (searchParams.get("id") || "").trim();
 
   useEffect(() => {
     resetDraft();
-    // תמיד חוזרים למסך הראשי אחרי סיום
-    const t = setTimeout(() => {
-      if (typeof window !== "undefined") {
-        window.location.assign("/");
-      } else {
-        router.replace("/");
-      }
-    }, 800);
-    return () => clearTimeout(t);
-  }, [resetDraft, router]);
+  }, [resetDraft]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-4">
-      <div className="max-w-md w-full rounded-3xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-zinc-100 px-6 py-8 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
-          <span className="text-3xl leading-none text-emerald-500">✓</span>
+    <div className="app-page flex min-h-[70vh] items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md text-center">
+        <div
+          className="mx-auto mb-6 flex h-28 w-28 items-center justify-center rounded-full bg-emerald-500 shadow-[0_8px_28px_rgba(16,185,129,0.45)]"
+          aria-hidden
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-16 w-16"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
         </div>
-        <h1 className="text-xl font-bold text-zinc-900 mb-2">
-          ההזמנה נשמרה בהצלחה
+
+        <h1 className="text-2xl font-bold text-zinc-900 sm:text-3xl">
+          הזמנתך נקלטה בהצלחה
         </h1>
-        <p className="mt-2 text-sm text-zinc-600 mb-4">
-          מעבירים אותך למסך הראשי…
+
+        {orderId ? (
+          <p className="mt-4 text-lg text-zinc-700">
+            מספר הזמנה:{" "}
+            <span className="font-bold text-brand" dir="ltr">
+              {orderId}
+            </span>
+          </p>
+        ) : (
+          <p className="mt-4 text-base text-zinc-600">ההזמנה נשמרה במערכת</p>
+        )}
+
+        <p className="mt-3 text-sm text-zinc-500">
+          הקבלה נשלחה למייל הגמ״ח
         </p>
+
         <a
           href="/"
-          className="inline-flex items-center justify-center rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-[0_2px_12px_rgba(200,90,108,0.35)] hover:bg-brand-dark transition-colors"
+          className="mt-8 inline-flex items-center justify-center rounded-xl bg-brand px-6 py-3 text-sm font-semibold text-white shadow-[0_2px_12px_rgba(200,90,108,0.35)] hover:bg-brand-dark transition-colors"
         >
-          למסך הראשי עכשיו
+          למסך הראשי
         </a>
       </div>
     </div>
+  );
+}
+
+export default function ConfirmationPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="app-page flex min-h-[50vh] items-center justify-center text-zinc-500">
+          טוען…
+        </div>
+      }
+    >
+      <ConfirmationContent />
+    </Suspense>
   );
 }
