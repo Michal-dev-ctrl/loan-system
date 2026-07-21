@@ -43,6 +43,7 @@ const catalog = [
 describe("buildReceiptContent", () => {
   it("includes customer, items and totals in text", () => {
     const receipt = buildReceiptContent(rental, catalog);
+    assert.match(receipt.subject, /מערכת ההשאלה של גמ״ח אור לכלה/);
     assert.match(receipt.subject, /12/);
     assert.match(receipt.text, /מיכל שי/);
     assert.match(receipt.text, /0556771200/);
@@ -60,5 +61,12 @@ describe("buildReceiptContent", () => {
     assert.match(receipt.html, /מצנח/);
     assert.match(receipt.html, /a@b.com/);
     assert.match(receipt.html, /סה&quot;כ לתשלום עכשיו/);
+  });
+
+  it("lists every selected equipment line in the body", () => {
+    const receipt = buildReceiptContent(rental, catalog);
+    assert.match(receipt.text, /— ציוד ופריטים —/);
+    assert.match(receipt.html, /ציוד ופריטים/);
+    assert.match(receipt.html, /דרבוקות/);
   });
 });
