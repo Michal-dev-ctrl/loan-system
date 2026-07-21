@@ -289,7 +289,7 @@ export default function SummaryPage() {
             />
           </div>
           <h1 className="text-2xl font-bold text-brand-green text-center">
-            גמ"ח אור לכלה שמחת ״יום טוב״
+            {"גמ\"ח אור לכלה שמחת ״יום טוב״"}
           </h1>
           <p className="mt-1 text-lg font-semibold text-zinc-700 text-center">
             סיכום הזמנה וקבלה
