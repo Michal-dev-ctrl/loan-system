@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppHeader } from "../components/AppHeader";
 import { formatDisplayDate, formatHebrewDateShort } from "../../lib/formatDate";
 import {
@@ -13,6 +13,7 @@ import {
   migrateLocalRentals,
   readLocalRentals,
 } from "../../lib/rentals/client";
+import { filterRentals } from "../../lib/rentals/search";
 import type { SavedRental } from "../../lib/rentals/types";
 
 export default function SearchPage() {
@@ -26,23 +27,14 @@ export default function SearchPage() {
   const [migrating, setMigrating] = useState(false);
   const [needsBlobSetup, setNeedsBlobSetup] = useState(false);
   const [autoMigrateNote, setAutoMigrateNote] = useState<string | null>(null);
+  const searchTextRef = useRef(searchText);
+  searchTextRef.current = searchText;
 
   const applyFilter = useCallback((rentals: SavedRental[], termRaw: string) => {
-    const term = termRaw.trim().toLowerCase();
-    if (!term) return rentals;
-    return rentals.filter((rental) => {
-      const fullName =
-        `${rental.personal.firstName} ${rental.personal.lastName}`.toLowerCase();
-      return (
-        fullName.includes(term) ||
-        rental.personal.phone1.toLowerCase().includes(term) ||
-        rental.personal.phone2.toLowerCase().includes(term) ||
-        String(rental.id).toLowerCase().includes(term)
-      );
-    });
+    return filterRentals(rentals, termRaw);
   }, []);
 
-  const loadFromServer = useCallback(async (term = "") => {
+  const loadFromServer = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -81,6 +73,8 @@ export default function SearchPage() {
         setLocalPending([]);
       }
 
+      // תמיד מסננים לפי מה שכתוב עכשיו בתיבה (גם אם הקלידו בזמן הטעינה)
+      const term = searchTextRef.current;
       setAllRentals(rentals);
       setResults(applyFilter(rentals, term));
     } catch (err) {
@@ -95,10 +89,8 @@ export default function SearchPage() {
 
   useEffect(() => {
     if (pathname === "/search") {
-      void loadFromServer(searchText);
+      void loadFromServer();
     }
-    // נטען מחדש רק בכניסה לעמוד, לא בכל הקלדה בחיפוש
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, loadFromServer]);
 
   useEffect(() => {
@@ -110,6 +102,10 @@ export default function SearchPage() {
   const handleSearchChange = (value: string) => {
     setSearchText(value);
     setResults(applyFilter(allRentals, value));
+  };
+
+  const runSearch = () => {
+    setResults(applyFilter(allRentals, searchTextRef.current));
   };
 
   const handleDelete = async (rental: SavedRental) => {
@@ -141,7 +137,7 @@ export default function SearchPage() {
       const result = await migrateLocalRentals(localPending);
       clearLocalRentals();
       setLocalPending([]);
-      await loadFromServer(searchText);
+      await loadFromServer();
       alert(
         `הועברו ${result.imported} הזמנות לשרת` +
           (result.skipped ? ` (דולגו ${result.skipped} שכבר קיימות)` : ""),
@@ -263,22 +259,42 @@ export default function SearchPage() {
           )}
 
           <div className="mt-8 space-y-4">
-            <div>
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                runSearch();
+              }}
+            >
               <label
                 htmlFor="searchText"
                 className="block text-sm font-medium text-right text-zinc-700"
               >
                 חיפוש
               </label>
-              <input
-                id="searchText"
-                type="text"
-                value={searchText}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-foreground focus:border-brand focus:ring-2 focus:ring-brand/20"
-                placeholder="הקלד שם, טלפון או מספר הזמנה..."
-              />
-            </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                <input
+                  id="searchText"
+                  type="search"
+                  inputMode="search"
+                  enterKeyHint="search"
+                  value={searchText}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-foreground focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  placeholder="הקלידי שם, טלפון או מספר הזמנה..."
+                  autoComplete="off"
+                />
+                <button
+                  type="submit"
+                  className="shrink-0 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-[0_2px_6px_rgba(200,90,108,0.3)] hover:bg-brand-dark"
+                >
+                  חפש
+                </button>
+              </div>
+              <p className="text-xs text-zinc-500 text-right">
+                אפשר גם לחפש עם מקפים או רווחים, למשל 055-677-1200
+              </p>
+            </form>
 
             <div className="rounded-xl border border-brand-soft/60 bg-brand-soft/20 px-4 py-4 text-sm text-right">
               {loading ? (
@@ -288,7 +304,7 @@ export default function SearchPage() {
                   <p className="text-red-600">{error}</p>
                   <button
                     type="button"
-                    onClick={() => void loadFromServer(searchText)}
+                    onClick={() => void loadFromServer()}
                     className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium border border-zinc-200"
                   >
                     נסי שוב
@@ -296,9 +312,17 @@ export default function SearchPage() {
                 </div>
               ) : results.length === 0 ? (
                 <p className="text-zinc-500">
-                  אין עדיין הזמנות שמורות, או שלא נמצאו תוצאות תואמות.
+                  {allRentals.length === 0
+                    ? "אין עדיין הזמנות שמורות בשרת."
+                    : `לא נמצאו תוצאות עבור "${searchText.trim()}".`}
                 </p>
               ) : (
+                <>
+                  {searchText.trim() && (
+                    <p className="mb-3 text-xs font-medium text-brand-dark">
+                      נמצאו {results.length} תוצאות
+                    </p>
+                  )}
                 <ul className="space-y-3">
                   {results.map((rental) => {
                     const fullName =
@@ -397,6 +421,7 @@ export default function SearchPage() {
                     );
                   })}
                 </ul>
+                </>
               )}
             </div>
           </div>
