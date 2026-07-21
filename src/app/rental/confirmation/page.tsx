@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRentalDraft } from "../RentalContext";
@@ -53,12 +54,12 @@ function ConfirmationContent() {
           הקבלה נשלחה למייל הגמ״ח
         </p>
 
-        <a
+        <Link
           href="/"
           className="mt-8 inline-flex items-center justify-center rounded-xl bg-brand px-6 py-3 text-sm font-semibold text-white shadow-[0_2px_12px_rgba(200,90,108,0.35)] hover:bg-brand-dark transition-colors"
         >
           למסך הראשי
-        </a>
+        </Link>
       </div>
     </div>
   );
