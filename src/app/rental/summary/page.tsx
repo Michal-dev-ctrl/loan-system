@@ -8,6 +8,7 @@ import { AppHeader } from "../../components/AppHeader";
 import { formatDisplayDate, formatHebrewDateShort } from "../../../lib/formatDate";
 import { createRentalApi, updateRentalApi } from "../../../lib/rentals/client";
 import type { SavedRental } from "../../../lib/rentals/types";
+import { DEFAULT_RECEIPT_TO } from "../../../lib/email/receipt";
 
 const EMAIL_DOMAINS = [
   "gmail.com",
@@ -33,11 +34,14 @@ export default function SummaryPage() {
   const [phoneRest, setPhoneRest] = useState("");
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSendMessage, setEmailSendMessage] = useState<"success" | "error" | null>(null);
+  const [lastSentTo, setLastSentTo] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [extraChargeAmount, setExtraChargeAmount] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isFinishing, setIsFinishing] = useState(false);
+  const allowCustomEmail =
+    process.env.NEXT_PUBLIC_RECEIPT_ALLOW_CUSTOM_TO === "true";
 
   const donation = draft.deposit.donationAmount;
   const depositAmount = draft.deposit.depositAmount;
@@ -224,11 +228,12 @@ export default function SummaryPage() {
 
     if (contactSendType === "email") {
       const local = emailLocal.trim();
-      if (!local) {
+      const fullEmail =
+        allowCustomEmail && local ? `${local}@${emailDomain}` : undefined;
+      if (allowCustomEmail && !local) {
         alert("נא להזין את חלק כתובת המייל לפני ה־@ (שם המשתמש).");
         return;
       }
-      const fullEmail = `${local}@${emailDomain}`;
       const subject = `קבלה מגמ"ח אור לכלה שמחת "יום טוב" - ${rental.id}`;
       setEmailSendMessage(null);
       setIsSendingEmail(true);
@@ -236,11 +241,18 @@ export default function SummaryPage() {
         const res = await fetch("/api/send-receipt", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to: fullEmail, subject, text }),
+          body: JSON.stringify({
+            to: fullEmail || DEFAULT_RECEIPT_TO,
+            subject,
+            text,
+          }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.success) {
           setEmailSendMessage("success");
+          setLastSentTo(
+            typeof data.sentTo === "string" ? data.sentTo : DEFAULT_RECEIPT_TO,
+          );
         } else {
           setEmailSendMessage("error");
           alert(data?.error || "שליחת המייל נכשלה. נסי שוב או בדקי את ההגדרות.");
@@ -537,29 +549,39 @@ export default function SummaryPage() {
               </div>
               {contactSendType === "email" ? (
                 <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-1 rounded-xl border border-zinc-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-brand/20 focus-within:border-brand" dir="ltr">
-                  <input
-                    type="text"
-                    value={emailLocal}
-                    onChange={(e) => setEmailLocal(e.target.value)}
-                    placeholder="שם משתמש"
-                    className="flex-1 min-w-[80px] px-3 py-2.5 text-sm text-foreground placeholder:text-zinc-400 border-0 bg-transparent text-left"
-                  />
-                  <span className="text-zinc-500 px-0.5">@</span>
-                  <select
-                    value={emailDomain}
-                    onChange={(e) => setEmailDomain(e.target.value)}
-                    className="rounded-none border-0 bg-zinc-50 px-3 py-2.5 text-sm text-foreground border-l border-zinc-200"
-                  >
-                    {EMAIL_DOMAINS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-                <p className="text-[11px] text-zinc-500 text-right leading-relaxed">
-                  הקבלה נשלחת למייל הגמ״ח (g025871999@gmail.com). כתובת הלקוח
-                  נשמרת בתוך גוף המייל לתיעוד.
-                </p>
+                  <div className="rounded-xl border border-brand-soft/60 bg-brand-soft/20 px-3 py-2.5 text-right text-xs text-brand-dark">
+                    הקבלה תישלח אל:{" "}
+                    <span className="font-semibold" dir="ltr">
+                      {DEFAULT_RECEIPT_TO}
+                    </span>
+                  </div>
+                  {allowCustomEmail ? (
+                    <div className="flex flex-wrap items-center gap-1 rounded-xl border border-zinc-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-brand/20 focus-within:border-brand" dir="ltr">
+                      <input
+                        type="text"
+                        value={emailLocal}
+                        onChange={(e) => setEmailLocal(e.target.value)}
+                        placeholder="שם משתמש"
+                        className="flex-1 min-w-[80px] px-3 py-2.5 text-sm text-foreground placeholder:text-zinc-400 border-0 bg-transparent text-left"
+                      />
+                      <span className="text-zinc-500 px-0.5">@</span>
+                      <select
+                        value={emailDomain}
+                        onChange={(e) => setEmailDomain(e.target.value)}
+                        className="rounded-none border-0 bg-zinc-50 px-3 py-2.5 text-sm text-foreground border-l border-zinc-200"
+                      >
+                        {EMAIL_DOMAINS.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-zinc-500 text-right leading-relaxed">
+                      כרגע Resend מאפשר שליחה רק למייל של החשבון (בלי דומיין
+                      בתשלום). בעתיד, אחרי אימות דומיין ב־resend.com/domains,
+                      אפשר יהיה להפעיל שליחה למיילים אחרים.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div dir="rtl" className="flex gap-2 rounded-xl border border-zinc-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-brand/20 focus-within:border-brand">
@@ -584,7 +606,7 @@ export default function SummaryPage() {
               )}
               {emailSendMessage === "success" && (
                 <p className="text-center text-sm font-medium text-green-600 mb-2">
-                  הקבלה נשלחה ל־g025871999@gmail.com
+                  הקבלה נשלחה ל־{lastSentTo || DEFAULT_RECEIPT_TO}
                 </p>
               )}
               <button

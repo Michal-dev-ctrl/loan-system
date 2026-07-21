@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import {
   buildReceiptEmailText,
+  getConfiguredReceiptTo,
   missingResendKeyMessage,
   resolveReceiptDestination,
 } from "../../../lib/email/receipt";
@@ -36,14 +37,19 @@ export async function POST(request: Request) {
       text?: string;
     };
 
-    if (!to || typeof to !== "string" || !to.includes("@")) {
+    const requested =
+      typeof to === "string" && to.trim().includes("@") ? to.trim() : undefined;
+
+    const { to: destination, customerEmail, usedCustomTo } =
+      resolveReceiptDestination(requested);
+
+    if (!destination.includes("@")) {
       return NextResponse.json(
-        { error: "נא להזין כתובת מייל תקינה" },
-        { status: 400 },
+        { error: "לא הוגדרה כתובת מייל לקבלת קבלות" },
+        { status: 500 },
       );
     }
 
-    const { to: destination, customerEmail } = resolveReceiptDestination(to);
     const subjectStr =
       typeof subject === "string" && subject.trim() ? subject : "קבלה";
     const textStr = buildReceiptEmailText(
@@ -69,6 +75,8 @@ export async function POST(request: Request) {
       success: true,
       id: data?.id,
       sentTo: destination,
+      usedCustomTo,
+      defaultTo: getConfiguredReceiptTo(),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "שגיאה לא צפויה";
