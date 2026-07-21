@@ -15,10 +15,17 @@ describe("receipt email destination", () => {
   });
 
   it("always sends to the gmach inbox by default", () => {
+    assert.equal(DEFAULT_RECEIPT_TO, "g025817999@gmail.com");
     const result = resolveReceiptDestination("customer@gmail.com");
     assert.equal(result.to, DEFAULT_RECEIPT_TO);
     assert.equal(result.customerEmail, "customer@gmail.com");
     assert.equal(result.usedCustomTo, false);
+  });
+
+  it("does not duplicate gmach inbox as customer-email note", () => {
+    const result = resolveReceiptDestination(DEFAULT_RECEIPT_TO);
+    assert.equal(result.to, DEFAULT_RECEIPT_TO);
+    assert.equal(result.customerEmail, null);
   });
 
   it("keeps customer email in the body for documentation", () => {
