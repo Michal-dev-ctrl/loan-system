@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/rentals/search.test.ts src/lib/email/receipt.test.ts"
+    "test": "tsx --test src/lib/rentals/search.test.ts src/lib/email/receipt.test.ts src/lib/email/buildReceipt.test.ts"
   },
   "dependencies": {
     "@hebcal/core": "^6.0.8",
