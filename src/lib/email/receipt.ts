@@ -1,9 +1,9 @@
 /**
- * בלי דומיין מאומת, Resend מאפשר שליחה רק למייל של בעל החשבון.
- * אצלך זה ms0556771200@gmail.com (כפי שמופיע בהודעת השגיאה של Resend).
- * אפשר לשנות ב־Vercel עם RECEIPT_EMAIL_TO אחרי שאימות דומיין יאפשר כתובות אחרות.
+ * מייל הגמ״ח / הלקוח שאליו נשלחות קבלות.
+ * חשוב: ב־Resend בלי דומיין אפשר לשלוח רק למייל של בעל החשבון —
+ * לכן חשבון Resend חייב להיות מחובר לכתובת הזו (לא למייל אישי אחר).
  */
-export const DEFAULT_RECEIPT_TO = "ms0556771200@gmail.com";
+export const DEFAULT_RECEIPT_TO = "g025817999@gmail.com";
 
 export function getConfiguredReceiptTo(): string {
   const fromEnv = process.env.RECEIPT_EMAIL_TO?.trim();
