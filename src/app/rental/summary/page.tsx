@@ -158,13 +158,47 @@ export default function SummaryPage() {
     }, 200);
   };
 
+  const sendReceiptEmail = async (rental: SavedRental): Promise<{
+    ok: boolean;
+    sentTo?: string;
+    error?: string;
+  }> => {
+    const receipt = buildReceiptContent(rental, catalog);
+    try {
+      const res = await fetch("/api/send-receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: DEFAULT_RECEIPT_TO,
+          subject: receipt.subject,
+          text: receipt.text,
+          html: receipt.html,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        return {
+          ok: true,
+          sentTo:
+            typeof data.sentTo === "string" ? data.sentTo : DEFAULT_RECEIPT_TO,
+        };
+      }
+      return {
+        ok: false,
+        error: data?.error || "שליחת המייל נכשלה",
+      };
+    } catch {
+      return { ok: false, error: "שגיאה בשליחת המייל" };
+    }
+  };
+
   const handleSaveAndEmail = async () => {
     const rental = await saveRental();
     if (!rental) return;
-    const receipt = buildReceiptContent(rental, catalog);
     if (typeof window === "undefined") return;
 
     if (contactSendType === "phone") {
+      const receipt = buildReceiptContent(rental, catalog);
       const digits = phoneRest.replace(/\D/g, "");
       const fullPhone = phonePrefix + digits;
       if (fullPhone.length >= 10) {
@@ -176,49 +210,40 @@ export default function SummaryPage() {
       return;
     }
 
-    if (contactSendType === "email") {
-      const local = emailLocal.trim();
-      const fullEmail =
-        allowCustomEmail && local ? `${local}@${emailDomain}` : undefined;
-      if (allowCustomEmail && !local) {
-        alert("נא להזין את חלק כתובת המייל לפני ה־@ (שם המשתמש).");
-        return;
-      }
-      setEmailSendMessage(null);
-      setIsSendingEmail(true);
-      try {
-        const res = await fetch("/api/send-receipt", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: fullEmail || DEFAULT_RECEIPT_TO,
-            subject: receipt.subject,
-            text: receipt.text,
-            html: receipt.html,
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.success) {
-          setEmailSendMessage("success");
-          setLastSentTo(
-            typeof data.sentTo === "string" ? data.sentTo : DEFAULT_RECEIPT_TO,
-          );
-        } else {
-          setEmailSendMessage("error");
-          alert(data?.error || "שליחת המייל נכשלה. נסי שוב או בדקי את ההגדרות.");
-        }
-      } catch {
+    setEmailSendMessage(null);
+    setIsSendingEmail(true);
+    try {
+      const result = await sendReceiptEmail(rental);
+      if (result.ok) {
+        setEmailSendMessage("success");
+        setLastSentTo(result.sentTo || DEFAULT_RECEIPT_TO);
+      } else {
         setEmailSendMessage("error");
-        alert("שגיאה בשליחת המייל. נסי שוב.");
-      } finally {
-        setIsSendingEmail(false);
+        alert(result.error || "שליחת המייל נכשלה. נסי שוב או בדקי את ההגדרות.");
       }
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
   const handleFinish = async () => {
     const rental = await saveRental();
     if (!rental) return;
+
+    // תמיד שולחים קבלה למייל ברירת המחדל בסיום הזמנה
+    setIsSendingEmail(true);
+    const result = await sendReceiptEmail(rental);
+    setIsSendingEmail(false);
+    if (result.ok) {
+      setLastSentTo(result.sentTo || DEFAULT_RECEIPT_TO);
+      setEmailSendMessage("success");
+    } else {
+      alert(
+        (result.error || "שליחת הקבלה למייל נכשלה") +
+          "\nההזמנה נשמרה. אפשר לשלוח שוב מהכפתור «שמירה + שליחת קבלה».",
+      );
+    }
+
     // מונע redirect לפרטים אישיים בגלל איפוס הטיוטה
     setIsFinishing(true);
     resetDraft();
@@ -569,14 +594,16 @@ export default function SummaryPage() {
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={handleFinish}
-              disabled={isSaving}
-              className="w-full rounded-xl bg-brand py-3.5 text-center text-sm font-bold text-white shadow-[0_2px_12px_rgba(200,90,108,0.35)] hover:bg-brand-dark transition-colors mt-1 disabled:opacity-70"
-            >
-              {isSaving ? "שומר…" : "סיום ההזמנה"}
-            </button>
+              <button
+                type="button"
+                onClick={handleFinish}
+                disabled={isSaving || isSendingEmail}
+                className="w-full rounded-xl bg-brand py-3.5 text-center text-sm font-bold text-white shadow-[0_2px_12px_rgba(200,90,108,0.35)] hover:bg-brand-dark transition-colors mt-1 disabled:opacity-70"
+              >
+                {isSaving || isSendingEmail
+                  ? "שומר ושולח קבלה…"
+                  : "סיום ההזמנה + שליחת קבלה למייל"}
+              </button>
           </div>
         </section>
         </div>
