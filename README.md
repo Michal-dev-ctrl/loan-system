@@ -75,6 +75,35 @@ npm start
 
 ---
 
+## שליחת קבלה במייל (Resend)
+
+הקבלה נשלחת תמיד ל־**g025871999@gmail.com** (מייל הגמ״ח). כתובת הלקוח נשמרת בגוף המייל לתיעוד.
+
+אם מופיעה השגיאה **«חסר מפתח API»**:
+
+1. היכנסי ל־[resend.com](https://resend.com) והתחברי (עם אותו Gmail אם אפשר)
+2. **API Keys** → **Create API Key** → העתיקי את המפתח (`re_...`)
+3. ב־Vercel → פרויקט `loan-system-gmach-or` → **Settings** → **Environment Variables**
+4. הוסיפי משתנה:
+   - Name: `RESEND_API_KEY`
+   - Value: המפתח שהעתקת
+   - Environment: סמני **Production** (וגם Preview אם רוצים)
+5. **Save** → אחר כך **Deployments** → **Redeploy**
+
+בפיתוח מקומי: צרי קובץ `.env.local` לפי `.env.example`.
+
+---
+
+## בדיקות אוטומטיות
+
+```bash
+npm test
+```
+
+בודק בין השאר חיפוש לפי טלפון ותקינות מספרי נייד, ואת יעד שליחת הקבלה.
+
+---
+
 ## איך להוסיף שינויים בעתיד
 
 1. **פתחי את הפרויקט ב־Cursor (או VS Code):**  

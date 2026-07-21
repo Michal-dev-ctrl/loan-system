@@ -289,7 +289,7 @@ export default function SummaryPage() {
             />
           </div>
           <h1 className="text-2xl font-bold text-brand-green text-center">
-            גמ"ח אור לכלה שמחת ״יום טוב״
+            {"גמ\"ח אור לכלה שמחת ״יום טוב״"}
           </h1>
           <p className="mt-1 text-lg font-semibold text-zinc-700 text-center">
             סיכום הזמנה וקבלה
@@ -536,6 +536,7 @@ export default function SummaryPage() {
                 </button>
               </div>
               {contactSendType === "email" ? (
+                <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-1 rounded-xl border border-zinc-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-brand/20 focus-within:border-brand" dir="ltr">
                   <input
                     type="text"
@@ -554,6 +555,11 @@ export default function SummaryPage() {
                       <option key={d} value={d}>{d}</option>
                     ))}
                   </select>
+                </div>
+                <p className="text-[11px] text-zinc-500 text-right leading-relaxed">
+                  הקבלה נשלחת למייל הגמ״ח (g025871999@gmail.com). כתובת הלקוח
+                  נשמרת בתוך גוף המייל לתיעוד.
+                </p>
                 </div>
               ) : (
                 <div dir="rtl" className="flex gap-2 rounded-xl border border-zinc-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-brand/20 focus-within:border-brand">
@@ -578,7 +584,7 @@ export default function SummaryPage() {
               )}
               {emailSendMessage === "success" && (
                 <p className="text-center text-sm font-medium text-green-600 mb-2">
-                  המייל נשלח בהצלחה לכתובת שהזנת.
+                  הקבלה נשלחה ל־g025871999@gmail.com
                 </p>
               )}
               <button
