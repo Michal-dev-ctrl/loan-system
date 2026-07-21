@@ -233,7 +233,7 @@ export function buildReceiptContent(
 </html>`;
 
   return {
-    subject: `קבלה מגמ"ח אור לכלה – הזמנה ${rental.id}`,
+    subject: `קבלה ממערכת ההשאלה של גמ״ח אור לכלה – הזמנה ${rental.id}`,
     text: textLines.join("\n"),
     html,
   };
