@@ -5,6 +5,16 @@ export function digitsOnly(value: string | null | undefined): string {
   return String(value ?? "").replace(/\D/g, "");
 }
 
+function phoneMatches(stored: string, termDigits: string): boolean {
+  if (!termDigits) return false;
+  const phone = digitsOnly(stored);
+  if (!phone) return false;
+  if (phone.includes(termDigits) || termDigits.includes(phone)) return true;
+  // לפעמים בשדה RTL הספרות נשמרות הפוך בתיבת החיפוש
+  const reversed = termDigits.split("").reverse().join("");
+  return phone.includes(reversed) || reversed.includes(phone);
+}
+
 export function rentalMatchesSearch(
   rental: SavedRental,
   termRaw: string,
@@ -30,11 +40,10 @@ export function rentalMatchesSearch(
 
   const termDigits = digitsOnly(term);
   if (termDigits.length >= 3) {
-    const p1 = digitsOnly(phone1);
-    const p2 = digitsOnly(phone2);
-    if (p1.includes(termDigits) || p2.includes(termDigits)) {
+    if (phoneMatches(phone1, termDigits) || phoneMatches(phone2, termDigits)) {
       return true;
     }
+    if (digitsOnly(id).includes(termDigits)) return true;
   }
 
   return false;

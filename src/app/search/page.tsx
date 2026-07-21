@@ -105,7 +105,8 @@ export default function SearchPage() {
   };
 
   const runSearch = () => {
-    setResults(applyFilter(allRentals, searchTextRef.current));
+    // טעינה מחדש מהשרת ואז סינון — כדי לא להיתקע עם עותק ישן מהדפדפן
+    void loadFromServer();
   };
 
   const handleDelete = async (rental: SavedRental) => {
@@ -275,24 +276,28 @@ export default function SearchPage() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                 <input
                   id="searchText"
-                  type="search"
+                  type="text"
                   inputMode="search"
                   enterKeyHint="search"
+                  dir="ltr"
                   value={searchText}
                   onChange={(e) => handleSearchChange(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-foreground focus:border-brand focus:ring-2 focus:ring-brand/20"
-                  placeholder="הקלידי שם, טלפון או מספר הזמנה..."
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-right text-foreground focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  placeholder="שם / טלפון / מספר הזמנה"
                   autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                 />
                 <button
                   type="submit"
-                  className="shrink-0 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-[0_2px_6px_rgba(200,90,108,0.3)] hover:bg-brand-dark"
+                  disabled={loading}
+                  className="shrink-0 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-[0_2px_6px_rgba(200,90,108,0.3)] hover:bg-brand-dark disabled:opacity-70"
                 >
-                  חפש
+                  {loading ? "מחפש…" : "חפש"}
                 </button>
               </div>
               <p className="text-xs text-zinc-500 text-right">
-                אפשר גם לחפש עם מקפים או רווחים, למשל 055-677-1200
+                חיפוש לפי שם, טלפון (גם עם מקפים) או מספר הזמנה
               </p>
             </form>
 
@@ -311,22 +316,31 @@ export default function SearchPage() {
                   </button>
                 </div>
               ) : results.length === 0 ? (
-                <p className="text-zinc-500">
-                  {allRentals.length === 0
-                    ? "אין עדיין הזמנות שמורות בשרת."
-                    : `לא נמצאו תוצאות עבור "${searchText.trim()}".`}
-                </p>
-              ) : (
-                <>
-                  {searchText.trim() && (
-                    <p className="mb-3 text-xs font-medium text-brand-dark">
-                      נמצאו {results.length} תוצאות
+                <div className="space-y-1">
+                  <p className="font-medium text-zinc-700">
+                    {allRentals.length === 0
+                      ? "אין עדיין הזמנות שמורות בשרת."
+                      : "לא נמצאו הזמנות תואמות"}
+                  </p>
+                  {allRentals.length > 0 && searchText.trim() && (
+                    <p className="text-xs text-zinc-500">
+                      חיפשת: {searchText.trim()} · סה״כ הזמנות בשרת:{" "}
+                      {allRentals.length}
                     </p>
                   )}
+                </div>
+              ) : (
+                <>
+                  <p className="mb-3 text-xs font-medium text-brand-dark">
+                    {searchText.trim()
+                      ? `נמצאו ${results.length} תוצאות עבור "${searchText.trim()}"`
+                      : `כל ההזמנות (${results.length})`}
+                  </p>
                 <ul className="space-y-3">
                   {results.map((rental) => {
                     const fullName =
-                      `${rental.personal.firstName} ${rental.personal.lastName}`.trim();
+                      `${rental.personal?.firstName ?? ""} ${rental.personal?.lastName ?? ""}`.trim() ||
+                      "ללא שם";
                     const isCompleted = rental.returnCompleted === true;
                     return (
                       <li
@@ -352,8 +366,11 @@ export default function SearchPage() {
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-zinc-600">
-                              טלפון: {rental.personal.phone1}
+                            <div className="text-xs text-zinc-600" dir="ltr">
+                              טלפון: {rental.personal?.phone1 || "—"}
+                              {rental.personal?.phone2
+                                ? ` · ${rental.personal.phone2}`
+                                : ""}
                             </div>
                             <div className="text-xs text-zinc-600">
                               מספר הזמנה: {rental.id}
