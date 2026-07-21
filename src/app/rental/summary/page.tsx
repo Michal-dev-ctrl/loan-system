@@ -247,12 +247,12 @@ export default function SummaryPage() {
     // מונע redirect לפרטים אישיים בגלל איפוס הטיוטה
     setIsFinishing(true);
     resetDraft();
-    // ניווט מלא לדף הבית (לא router) – בטוח יותר מול מסך הפרטים
+    const id = encodeURIComponent(String(rental.id));
     if (typeof window !== "undefined") {
-      window.location.assign("/");
+      window.location.assign(`/rental/confirmation?id=${id}`);
       return;
     }
-    router.replace("/");
+    router.replace(`/rental/confirmation?id=${id}`);
   };
 
   const rentalItemsForDisplay = catalog.filter(
