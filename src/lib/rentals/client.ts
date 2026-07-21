@@ -110,7 +110,8 @@ export async function fetchRentals(): Promise<{
 
   const localRentals = readLocalRentals();
   const byId = new Map<string, SavedRental>();
-  for (const rental of [...serverRentals, ...localRentals]) {
+  // שרת קודם לדפדפן: localStorage ישן עם אותו מספר הזמנה לא ידרוס טלפון/פרטים מהענן
+  for (const rental of [...localRentals, ...serverRentals]) {
     byId.set(String(rental.id).trim(), rental);
   }
 
