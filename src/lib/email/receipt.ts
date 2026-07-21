@@ -1,9 +1,8 @@
 /**
- * כרגע: מייל שעובד עם חשבון Resend הנוכחי.
- * מחר / כשמחליפים חשבון Resend ל־g025817999 — עדכני ב־Vercel:
- * RECEIPT_EMAIL_TO=g025817999@gmail.com (בלי לשנות קוד).
+ * מייל הגמ״ח שאליו נשלחות כל הקבלות.
+ * מחר: ודאי שחשבון Resend + RESEND_API_KEY הם של אותו מייל, ואז Redeploy.
  */
-export const DEFAULT_RECEIPT_TO = "ms0556771200@gmail.com";
+export const DEFAULT_RECEIPT_TO = "g025817999@gmail.com";
 
 export function getConfiguredReceiptTo(): string {
   const fromEnv = process.env.RECEIPT_EMAIL_TO?.trim();
@@ -38,7 +37,11 @@ export function resolveReceiptDestination(requestedTo?: string): {
 
   return {
     to: getConfiguredReceiptTo(),
-    customerEmail: customer,
+    customerEmail:
+      customer &&
+      customer.toLowerCase() !== getConfiguredReceiptTo().toLowerCase()
+        ? customer
+        : null,
     usedCustomTo: false,
   };
 }
