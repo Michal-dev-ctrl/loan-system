@@ -9,6 +9,7 @@ import { formatDisplayDate, formatHebrewDateShort } from "../../../lib/formatDat
 import { createRentalApi, updateRentalApi } from "../../../lib/rentals/client";
 import type { SavedRental } from "../../../lib/rentals/types";
 import { DEFAULT_RECEIPT_TO } from "../../../lib/email/receipt";
+import { buildReceiptContent } from "../../../lib/email/buildReceipt";
 
 const EMAIL_DOMAINS = [
   "gmail.com",
@@ -157,68 +158,17 @@ export default function SummaryPage() {
     }, 200);
   };
 
-  const buildReceiptText = (rental: SavedRental) => {
-    const lines: string[] = [];
-    lines.push('גמ"ח אור לכלה שמחת "יום טוב"');
-    lines.push("סיכום הזמנה וקבלה");
-    lines.push("");
-    lines.push(`מספר הזמנה: ${rental.id}`);
-    lines.push(`תאריך יצירה: ${formatDisplayDate(rental.createdAt)}`);
-    lines.push("");
-    lines.push("פרטי לקוח:");
-    lines.push(`שם: ${rental.personal.firstName} ${rental.personal.lastName}`);
-    lines.push(`טלפון 1: ${rental.personal.phone1}`);
-    if (rental.personal.phone2) {
-      lines.push(`טלפון 2: ${rental.personal.phone2}`);
-    }
-    lines.push("");
-    lines.push("פיקדון ותרומה:");
-    lines.push(
-      `סוג פיקדון: ${
-        rental.deposit.option === "cheque" ? "צ'ק פיקדון + תרומה" : "פיקדון מזומן + תרומה"
-      }`
-    );
-    lines.push(`סכום פיקדון: ${rental.deposit.depositAmount} ₪`);
-    lines.push(`תרומה: ${rental.deposit.donationAmount} ₪`);
-    lines.push("");
-    lines.push("תאריכים:");
-    const pickupHeb = formatHebrewDateShort(rental.dates.pickupDate);
-    const returnHeb = formatHebrewDateShort(rental.dates.returnDate);
-    lines.push(`תאריך לקיחה: ${formatDisplayDate(rental.dates.pickupDate)}${pickupHeb ? ` ${pickupHeb}` : ""}`);
-    lines.push(`תאריך החזרה: ${formatDisplayDate(rental.dates.returnDate)}${returnHeb ? ` ${returnHeb}` : ""}`);
-    if (rental.notes && rental.notes.trim()) {
-      lines.push("");
-      lines.push("פרטים נוספים / ציוד אחר:");
-      lines.push(rental.notes.trim());
-    }
-    lines.push("");
-    lines.push("סכומים:");
-    lines.push(`תרומה: ${rental.totals.donation} ₪`);
-    if (rental.deposit.option === "cash") {
-      lines.push(`פיקדון מזומן: ${rental.totals.depositAmount} ₪`);
-    }
-    lines.push(`סכום רכישת מוצרים: ${rental.totals.purchaseTotal} ₪`);
-    if (rental.totals.rentalTotal > 0) {
-      lines.push(`השכרת ציוד: ${rental.totals.rentalTotal} ₪`);
-    }
-    if (typeof rental.extraChargeAmount === "number" && rental.extraChargeAmount > 0) {
-      lines.push(`חיוב נוסף (אחר): ${rental.extraChargeAmount} ₪`);
-    }
-    lines.push(`סה"כ לתשלום עכשיו: ${rental.totals.totalToPayNow} ₪`);
-    return lines.join("\n");
-  };
-
   const handleSaveAndEmail = async () => {
     const rental = await saveRental();
     if (!rental) return;
-    const text = buildReceiptText(rental);
+    const receipt = buildReceiptContent(rental, catalog);
     if (typeof window === "undefined") return;
 
     if (contactSendType === "phone") {
       const digits = phoneRest.replace(/\D/g, "");
       const fullPhone = phonePrefix + digits;
       if (fullPhone.length >= 10) {
-        const encodedText = encodeURIComponent(text);
+        const encodedText = encodeURIComponent(receipt.text);
         window.open(`https://wa.me/972${fullPhone.slice(1)}?text=${encodedText}`, "_blank");
         return;
       }
@@ -234,7 +184,6 @@ export default function SummaryPage() {
         alert("נא להזין את חלק כתובת המייל לפני ה־@ (שם המשתמש).");
         return;
       }
-      const subject = `קבלה מגמ"ח אור לכלה שמחת "יום טוב" - ${rental.id}`;
       setEmailSendMessage(null);
       setIsSendingEmail(true);
       try {
@@ -243,8 +192,9 @@ export default function SummaryPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             to: fullEmail || DEFAULT_RECEIPT_TO,
-            subject,
-            text,
+            subject: receipt.subject,
+            text: receipt.text,
+            html: receipt.html,
           }),
         });
         const data = await res.json().catch(() => ({}));

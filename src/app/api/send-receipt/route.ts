@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import {
-  buildReceiptEmailText,
   getConfiguredReceiptTo,
   missingResendKeyMessage,
   resolveReceiptDestination,
@@ -31,10 +30,11 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { to, subject, text } = body as {
+    const { to, subject, text, html } = body as {
       to?: string;
       subject?: string;
       text?: string;
+      html?: string;
     };
 
     const requested =
@@ -52,16 +52,25 @@ export async function POST(request: Request) {
 
     const subjectStr =
       typeof subject === "string" && subject.trim() ? subject : "קבלה";
-    const textStr = buildReceiptEmailText(
-      typeof text === "string" ? text : "",
-      customerEmail,
-    );
+    let textStr = typeof text === "string" ? text : "";
+    if (customerEmail && textStr && !textStr.includes(customerEmail)) {
+      textStr = `מייל לקוח (לתיעוד): ${customerEmail}\n\n${textStr}`;
+    }
+    if (!textStr.trim()) {
+      return NextResponse.json(
+        { error: "חסר תוכן הקבלה לשליחה" },
+        { status: 400 },
+      );
+    }
+
+    const htmlStr = typeof html === "string" && html.trim() ? html : undefined;
 
     const { data, error } = await resend.emails.send({
       from: FROM,
       to: [destination],
       subject: subjectStr,
       text: textStr,
+      ...(htmlStr ? { html: htmlStr } : {}),
     });
 
     if (error) {
