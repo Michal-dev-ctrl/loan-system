@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { Suspense, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useRentalDraft } from "../RentalContext";
 
 function ConfirmationContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { resetDraft } = useRentalDraft();
   const orderId = (searchParams.get("id") || "").trim();
@@ -13,6 +14,17 @@ function ConfirmationContent() {
   useEffect(() => {
     resetDraft();
   }, [resetDraft]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (typeof window !== "undefined") {
+        window.location.assign("/");
+      } else {
+        router.replace("/");
+      }
+    }, 3500);
+    return () => clearTimeout(t);
+  }, [router]);
 
   return (
     <div className="app-page flex min-h-[70vh] items-center justify-center px-4 py-10">
@@ -54,11 +66,15 @@ function ConfirmationContent() {
           הקבלה נשלחה למייל הגמ״ח
         </p>
 
+        <p className="mt-6 text-sm text-zinc-500">
+          מעבירים אותך לתפריט הראשי…
+        </p>
+
         <Link
           href="/"
-          className="mt-8 inline-flex items-center justify-center rounded-xl bg-brand px-6 py-3 text-sm font-semibold text-white shadow-[0_2px_12px_rgba(200,90,108,0.35)] hover:bg-brand-dark transition-colors"
+          className="mt-4 inline-flex items-center justify-center rounded-xl bg-brand px-6 py-3 text-sm font-semibold text-white shadow-[0_2px_12px_rgba(200,90,108,0.35)] hover:bg-brand-dark transition-colors"
         >
-          למסך הראשי
+          לתפריט הראשי עכשיו
         </Link>
       </div>
     </div>
