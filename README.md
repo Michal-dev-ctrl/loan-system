@@ -78,13 +78,19 @@ npm start
 ## שליחת קבלה במייל (Resend)
 
 **מה אומרת ההודעה של Resend?**  
-בלי דומיין מאומת, Resend מאפשר לשלוח **רק למייל של בעל החשבון** (אצלך: `ms0556771200@gmail.com`). אי אפשר לשלוח ל־Gmail אחר עד שאימות דומיין ב־[resend.com/domains](https://resend.com/domains).
+בלי דומיין מאומת, Resend מאפשר לשלוח **רק למייל של בעל החשבון**.  
+אם החשבון נפתח עם מייל אישי — אי אפשר לשלוח למייל הגמ״ח.
+
+**כדי שהקבלות יגיעו ל־g025817999@gmail.com:**  
+1. היכנסי ל־[resend.com](https://resend.com) עם **g025817999@gmail.com** (או צרי חשבון חדש במייל הזה)  
+2. צרי API Key חדש  
+3. ב־Vercel עדכני את `RESEND_API_KEY` למפתח החדש → Redeploy  
+
+הקבלה נשלחת כברירת מחדל ל־**g025817999@gmail.com**.  
+בעתיד אחרי דומיין: הוסיפי ב־Vercel `RECEIPT_ALLOW_CUSTOM_TO=true` ו־`NEXT_PUBLIC_RECEIPT_ALLOW_CUSTOM_TO=true` (וגם עדכני `RESEND_FROM` למייל מהדומיין).
 
 **לכמה זמן זה עובד?**  
-שליחה למייל החשבון עובדת כל עוד המפתח `RESEND_API_KEY` מוגדר ב־Vercel ולא נמחק ב־Resend. זה לא «ניסיון לכמה ימים» — זו הגבלה של מצב הבדיקה בלי דומיין.
-
-הקבלה נשלחת כברירת מחדל ל־**ms0556771200@gmail.com**.  
-בעתיד אחרי דומיין: הוסיפי ב־Vercel `RECEIPT_ALLOW_CUSTOM_TO=true` ו־`NEXT_PUBLIC_RECEIPT_ALLOW_CUSTOM_TO=true` (וגם עדכני `RESEND_FROM` למייל מהדומיין).
+כל עוד המפתח `RESEND_API_KEY` מוגדר ב־Vercel ולא נמחק ב־Resend.
 
 אם מופיעה השגיאה **«חסר מפתח API»**:
 
